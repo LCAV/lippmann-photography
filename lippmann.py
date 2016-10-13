@@ -6,14 +6,15 @@ Created on Fri Jun 10 11:19:49 2016
 """
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import animation
 from scipy import integrate
 from scipy.interpolate import interp1d
 from scipy.fftpack import dct
-from itertools import product
 
-import color_tools as ct
+import os
+
 from spectrum import *
 
 
@@ -249,6 +250,7 @@ class LippmannPixel(object):
     
        
 class LippmannPlate(object):
+    """Class defining a Lippmann object for a 2D image (i.e. with spatial variation)"""
     
     def __init__(self, wave_lengths, n_x, n_y, r=None, direction=np.array([0.0, 0.0, 1.0]), light_spectrum=None, spectral_sensitivity=None, n=1.0, E_0=1.0, phi_0=np.pi/2.0):
         
@@ -328,9 +330,12 @@ class LippmannPlate(object):
             sines     = 0.5*(1 - np.cos(2.0*self.n*kTr) )
 #            sines     = -0.5*(np.cos(2.0*self.n*kTr) )
             
-            for x in xrange(self.width):
-                print x
-                for y in xrange(self.height):
+            for x in range(self.width):
+                perc = np.double(x)/np.double(self.width-1)*100
+                sys.stdout.write("\rComputing intensity: %.2f %%" %perc)
+                sys.stdout.flush()                
+                
+                for y in range(self.height):
                     integrand_i = self.spectrums.intensities[x, y, :, np.newaxis] * \
                     self.light_spectrum.intensities[:, np.newaxis] * sines
                     
@@ -359,8 +364,11 @@ class LippmannPlate(object):
             kTr     = np.outer(self.ks, self.direction).dot(self.r.T)
             cosines = np.cos(2*self.n*kTr)
                             
-            for x in xrange(self.width):
-                print x
+            for x in range(self.width):
+                perc = np.double(x)/np.double(self.width-1)*100
+                sys.stdout.write("\rComputing new spectrum: %.2f %%" %perc)
+                sys.stdout.flush() 
+                
                 for y in xrange(self.height):
                     
                     integrand = self.reflectances[x, y, :, np.newaxis] * cosines.T
@@ -371,7 +379,8 @@ class LippmannPlate(object):
             
     def to_uniform_freq(self, N_prime):
     
-        lippmann_discrete = LippmannPlateDiscrete(N_prime, self.width, self.height, light_spectrum=self.light_spectrum, \
+        lambda_max = np.max(self.spectrums.wave_lengths)
+        lippmann_discrete = LippmannPlateDiscrete(N_prime, self.width, self.height, lambda_max=lambda_max,  light_spectrum=self.light_spectrum, \
                             spectral_sensitivity=self.spectral_sensitivity, n=self.n, E_0=self.E_0, phi_0=self.phi_0)
                             
         old_wave_lengths = self.spectrums.wave_lengths
@@ -472,14 +481,32 @@ class LippmannPixelDiscrete(object):
 
 class LippmannPlateDiscrete(object):
     
-    def __init__(self, N_prime, n_x, n_y, light_spectrum=None, spectral_sensitivity=None, n=1.0, E_0=1.0, phi_0=np.pi/2.0):
+    def __init__(self, N_prime, n_x, n_y, lambda_max=700E-9, light_spectrum = None, spectral_sensitivity=None, n=1.0, E_0=1.0, phi_0=np.pi/2.0):
+        
+        #speed of light 
+        self.c0 = 299792458
+        self.c  = self.c0/n
+        self.epsilon_0 = 8.8541878176E-12
+        
+        #reds (or higher)
+        v_min = self.c/lambda_max
+        #blues
+        lambda_min = 390E-9
+        v_max = self.c/lambda_min
         
         self.N_prime = N_prime
-        self.N = np.floor(N_prime*77./34.)
+        self.N = np.int( np.floor(N_prime*v_max/(v_max-v_min)) )
             
         self.f_max = 2./(390E-9)
         self.df    = self.f_max/(self.N-1)
-        self.dr    = 1./(2.*self.f_max)  
+        self.dr    = 1./(2.*self.f_max)          
+        
+#        self.N_prime = N_prime
+#        self.N = np.int( np.floor(N_prime*77./34.) )
+#            
+#        self.f_max = 2./(390E-9)
+#        self.df    = self.f_max/(self.N-1)
+#        self.dr    = 1./(2.*self.f_max)  
         
         self.f           = np.arange(self.N)*self.df
         self.lambdas     = 2./self.f[-self.N_prime:]
@@ -497,10 +524,6 @@ class LippmannPlateDiscrete(object):
         self.A = E_0*np.exp(1j*phi_0)       #complex envelope
         self.n = n
 
-        #speed of light 
-        self.c0 = 299792458
-        self.c  = self.c0/n
-        self.epsilon_0 = 8.8541878176E-12
         
         if light_spectrum is None:
             self.light_spectrum = Spectrum( self.lambdas, np.ones(N_prime) )
@@ -524,9 +547,14 @@ class LippmannPlateDiscrete(object):
             self.intensities    = np.zeros([self.width, self.height, self.N])
             self.reflectances   = np.zeros([self.width, self.height, self.N])
             
-            for x in xrange(self.width):
-                print x
-                for y in xrange(self.height):
+#            sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+            
+            for x in range(self.width):
+                perc = np.double(x)/np.double(self.width-1)*100
+                sys.stdout.write("\rComputing intensity: %.2f %%" %perc)
+                sys.stdout.flush() 
+                
+                for y in range(self.height):
                     
                     #pad zeros to account for the lowpass band
                     x_i = np.hstack( [ np.zeros(self.N-self.N_prime), self.spectrums.intensities[x, y, :]*self.light_spectrum.intensities ] )
@@ -537,6 +565,7 @@ class LippmannPlateDiscrete(object):
 
                     self.intensities[x, y,:]  = g_i[0] - g_i
                     self.reflectances[x, y,:] = g_r[0] - g_r 
+
                     
     def compute_new_spectrum(self):
                 
@@ -547,10 +576,13 @@ class LippmannPlateDiscrete(object):
                 
             self.new_spectrums = Spectrums( self.lambdas, np.zeros([self.width, self.height, self.N_prime]) )
    
+   
+            for x in range(self.width):
+                perc = np.double(x)/np.double(self.width-1)*100
+                sys.stdout.write("\rComputing new spectrum: %.2f %%" %perc)
+                sys.stdout.flush()
                 
-            for x in xrange(self.width):
-                print x
-                for y in xrange(self.height):
+                for y in range(self.height):
                     
                     #Normalize    
                     G = 1./(2*(self.N-1))*dct(self.reflectances[x,y,:], type=1)

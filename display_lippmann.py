@@ -18,7 +18,10 @@ plt.close("all")
 gui_manager = None
 
 N_samples = 100
-theta_o   = np.pi/8.
+theta_o   = np.pi/4.
+theta_o   = 25./180.*np.pi
+theta_o = 0.
+
 
 path_CAVE = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/CAVE - multispectral image database/fake_and_real_strawberries_ms/fake_and_real_strawberries_ms'
 #path_CAVE = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/CAVE - multispectral image database/fake_and_real_peppers_ms/fake_and_real_peppers_ms'
@@ -30,7 +33,12 @@ path_SCIEN = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/SCIEN - S
 
 path_Suwannee = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/Multispectral image databases/Gulf_Wetlands_Sample_Rad/Suwannee_0609-1331_rad_small.mat'
 
+path_PURDUE = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/Purdue - DC'
+
+
+
 path_RGB = 'images/final_small2.jpg'
+path_RGB = 'images/final_raw_small.jpg'
 
 # LOAD SPECTRUM FROM CAVE DATABASE
 #try:
@@ -38,25 +46,24 @@ path_RGB = 'images/final_small2.jpg'
 #except NameError:
 from tools import *
 from lippmann import *
+
 lippmann_plate = load_multispectral_image_CAVE(path_CAVE)
-
 #lippmann_plate = load_multispectral_image_SCIEN(path_SCIEN)
-
 #lippmann_plate = load_multispectral_image_Suwannee(path_Suwannee)
+#lippmann_plate = load_multispectral_image_PURDUE(path_PURDUE)
 
 #Convert to discrete uniformly-sampled spectrums
 lippmann_plate = lippmann_plate.to_uniform_freq(N_samples)
 
-#Read from RGB image
-lippmann_plate = create_multispectral_image_discrete(path_RGB, N_samples)
-#lippmann_plate = create_multispectral_image(path_RGB, N_samples)
+#Read an RGB image
+#lippmann_plate = create_multispectral_image_discrete(path_RGB, N_samples)
 
 
 #compute intensity and new spectrum
 lippmann_plate.compute_new_spectrum()
 
 #shift of the spectrum towards the blues
-lippmann_plate.new_spectrums.blue_shift(1./np.cos(theta_o))
+lippmann_plate.new_spectrums.blue_shift(1./np.cos(theta_o), extrapolation='cste')
 
 lippmann_plate.spectrums.compute_rgb()
 lippmann_plate.new_spectrums.compute_rgb(sqrt=True)

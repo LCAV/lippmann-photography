@@ -35,6 +35,7 @@ class Spectrum(object):
             
         ax.clear()
         
+        #sort the wavelengths in order
         idx = np.argsort(self.wave_lengths)
         wl  = self.wave_lengths[idx]
         intensity = intensity[idx]
@@ -79,7 +80,7 @@ class Spectrums(object):
         
         idx = np.argsort(self.wave_lengths)
         wl  = self.wave_lengths[idx]
-        intensity = intensity[idx]        
+        intensity = intensity[idx]     
         
         l = len(self.wave_lengths)
         
@@ -114,12 +115,19 @@ class Spectrums(object):
           
         return self.rgb_colors
         
-    def blue_shift(self, factor):
+    def blue_shift(self, factor, extrapolation='zero'):
         
         f = interp1d(self.wave_lengths/factor, self.intensities, axis=2, kind='cubic', bounds_error=False, fill_value=0.)
 #        f = interp1d(self.wave_lengths*np.cos(factor), self.intensities, axis=2, kind='cubic', bounds_error=False, fill_value=0.)
+         
+        max_vals = self.intensities[:,:,0]
         self.intensities = np.maximum( f(self.wave_lengths), 0.)
-            
+        max_wavelength = np.max(self.wave_lengths)  
+        
+        
+        if extrapolation == 'cste':
+            idx = np.where(self.wave_lengths*factor > max_wavelength)[0]
+            self.intensities[:,:,idx] = max_vals[:, :, np.newaxis]
         
     def __setitem__(self, key, value):        
         self.intensities[:, :, key] = value
