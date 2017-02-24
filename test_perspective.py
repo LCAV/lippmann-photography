@@ -38,21 +38,7 @@ alpha   = 10     #angle of the prism (in DEGREES)
 n1      = 1.45   #refraction index of glass
 n2      = 1.0002 #refraction index of air
 
-def from_viewing_angle_to_theta_i(theta_2, alpha, n1, n2, deg=True):
-    
-    #convert to radians
-    if deg:
-        theta_2 = np.deg2rad(theta_2)
-        alpha   = np.deg2rad(alpha)
-    
-    theta_1_prime = theta_2+alpha
-    theta_1       = np.arcsin(n2/n1*np.sin(theta_1_prime))
-    theta_0_prime = alpha-theta_1
-    
-    if deg:
-        return np.rad2deg(theta_0_prime)
-    else:
-        return theta_0_prime
+
    
 #lippmann_plate = create_multispectral_image_discrete(path, n_samples)
 

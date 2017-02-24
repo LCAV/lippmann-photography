@@ -6,6 +6,7 @@ Created on Wed Jul  6 14:25:04 2016
 """
 
 import numpy as np
+import scipy as sp
 from scipy.interpolate import interp1d
 from scipy.optimize import nnls
 from skimage.color import rgb2xyz, xyz2rgb
@@ -102,29 +103,45 @@ def read_cie_data(wavelengths):
     return cmf_cie_interp_x, cmf_cie_interp_y, cmf_cie_interp_z
     
 
-def from_spectrum_to_xyz(wavelengths, spectral_colors):
-      
-    cmf_cie_x, cmf_cie_y, cmf_cie_z = read_cie_data(wavelengths=wavelengths) 
+def from_spectrum_to_xyz(wavelengths, spectral_colors, integrate_nu=True, normalize=True):
     
-    X = np.trapz(y=spectral_colors*cmf_cie_x, x=wavelengths, axis=spectral_colors.ndim-1)
-    Y = np.trapz(y=spectral_colors*cmf_cie_y, x=wavelengths, axis=spectral_colors.ndim-1)    
-    Z = np.trapz(y=spectral_colors*cmf_cie_z, x=wavelengths, axis=spectral_colors.ndim-1)    
+    c = 299792458    
     
-    #normalize
-#    x = X/(X+Y+Z)
-#    y = Y/(X+Y+Z)
-#    z = Z/(X+Y+Z)
+    cmf_cie_x, cmf_cie_y, cmf_cie_z = read_cie_data(wavelengths=wavelengths)
+    nu = c/wavelengths
+        
+#    if spectral_colors.ndim == 1:    
+#        X = sp.integrate.simps(y=spectral_colors*cmf_cie_x)
+#        Y = sp.integrate.simps(y=spectral_colors*cmf_cie_y)    
+#        Z = sp.integrate.simps(y=spectral_colors*cmf_cie_z)   
+#    
+#    else:
+    
+    if integrate_nu:
+        X = np.trapz(y=spectral_colors*cmf_cie_x, x=nu, axis=spectral_colors.ndim-1)
+        Y = np.trapz(y=spectral_colors*cmf_cie_y, x=nu, axis=spectral_colors.ndim-1)    
+        Z = np.trapz(y=spectral_colors*cmf_cie_z, x=nu, axis=spectral_colors.ndim-1)  
+    else:
+        X = np.trapz(y=spectral_colors*cmf_cie_x, x=wavelengths, axis=spectral_colors.ndim-1)
+        Y = np.trapz(y=spectral_colors*cmf_cie_y, x=wavelengths, axis=spectral_colors.ndim-1)    
+        Z = np.trapz(y=spectral_colors*cmf_cie_z, x=wavelengths, axis=spectral_colors.ndim-1)  
+    
+#    X = np.dot(spectral_colors, cmf_cie_x)
+#    Y = np.dot(spectral_colors, cmf_cie_y)
+#    Z = np.dot(spectral_colors, cmf_cie_z)
+    
     
     #'normalize'
-    normalization_cste = np.max(Y)
-    X = X/normalization_cste
-    Y = Y/normalization_cste
-    Z = Z/normalization_cste
+    if normalize:
+        normalization_cste = np.max(Y)
+        X = X/normalization_cste
+        Y = Y/normalization_cste
+        Z = Z/normalization_cste
         
 #    return np.stack([x,y,z], axis=-1)
     return np.stack([X,Y,Z], axis=-1)
     
-def from_xyz_to_spectrum(xyz_colors, wavelengths):
+def from_xyz_to_spectrum(xyz_colors, wavelengths, nnls=False):
     
     orig_shape = xyz_colors.shape
     xyz_colors = xyz_colors.reshape([-1,3])
@@ -144,13 +161,27 @@ def from_xyz_to_spectrum(xyz_colors, wavelengths):
     
     spectral_colors = np.linalg.lstsq(M, xyz_colors.T)[0].T
     
-#    for idx in xrange(xyz_colors.shape[0]):
-#        print idx
-#        
-##        spectral_colors[idx, :] = nnls(M, xyz_colors[idx,:])[0]
-#        spectral_colors[idx, :] = np.linalg.lstsq(M, xyz_colors[idx,:])[0]
+    
+    lambd=1E-3
+    #L2 regularization
+    D = np.eye(len(wavelengths))
+    #Smoothness: difference operator
+    D = 2*np.eye(len(wavelengths)) - np.eye(len(wavelengths), k=1) - np.eye(len(wavelengths), k=-1)
+    
+    A = np.concatenate((M, lambd*D) )
+    
+    for idx in range(xyz_colors.shape[0]):
+        print(idx)
         
-    return spectral_colors.reshape(orig_shape[:-1] + (len(wavelengths)))
+        if nnls:
+            
+            b = np.concatenate((xyz_colors[idx,:], np.zeros(len(wavelengths)) ))
+            spectral_colors[idx, :] = nnls(A, b)[0]
+            
+        else: #standard least squares
+            spectral_colors[idx, :] = np.linalg.lstsq(M, xyz_colors[idx,:])[0]
+        
+    return spectral_colors.reshape(orig_shape[:-1] + (len(wavelengths), ))
     
     
 def from_xyz_to_rgb(xyz_colors, normalize=True):

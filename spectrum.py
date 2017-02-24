@@ -98,9 +98,9 @@ class Spectrums(object):
         if self.xyz_colors is None:
             idx = np.argsort(self.wave_lengths)
             if sqrt:
-                self.xyz_colors = ct.from_spectrum_to_xyz(self.wave_lengths[idx], np.sqrt(self.intensities[:,:,idx]))
+                self.xyz_colors = ct.from_spectrum_to_xyz(self.wave_lengths[idx], np.sqrt(self.intensities[:,:,idx]), integrate_nu=False)
             else:
-                self.xyz_colors = ct.from_spectrum_to_xyz(self.wave_lengths[idx], self.intensities[:,:,idx])
+                self.xyz_colors = ct.from_spectrum_to_xyz(self.wave_lengths[idx], self.intensities[:,:,idx], integrate_nu=False)
           
         return self.xyz_colors
         

@@ -8,246 +8,98 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import animation
 from scipy import integrate
 from scipy.interpolate import interp1d
 from scipy.fftpack import dct
 
-import os
-
 from spectrum import *
 
 
-class LippmannPixel(object):
-    """Class defining a Lippmann object for a single pixel (no spatial variation)"""
+
+class Lippmann(object):
     
-    def __init__(self, object_spectrum, n = 1.0, E0 = 1.0, light_spectrum=None, spectral_sensitivity=None):
-        """Creates a new Lippmann pixel
+    def __init__(self, object_spectrum, n=1.0, light_spectrum=None, spectral_sensitivity=None):
         
-        Args:
-            object_spectrum:       the spectrum of the polychromatic wave of the object
-             n (double):           refraction index (default: 1.0)
-             E0 (double):          baseline amplitude (default: 1.0)
-             light_spectrum:       the spectrum of the light illuminating the object (default: None, which is equivalent to all ones)
-             spectral_sensitivity: the sensitivity of the plate to each frequency (default: None, which is equivalent to all ones)
-            
-        Returns:
-            A Lippmann pixel object
-        """     
+        wave_lengths = object_spectrum.wave_lengths
+        l = len(wave_lengths)  
         
-        self.n = n
-        self.E0 = E0
-        self.object_spectrum = object_spectrum
+        self._U = None
+        self._I = None
+        self._R = None
         
-        l = len(object_spectrum.intensities)
+        #speed of light 
+        self.c0 = 299792458
+        self.c  = self.c0/n
+        self.epsilon_0 = 8.8541878176E-12
+        
+        #self.direction = direction
+        self.ks = 2.0*np.pi/wave_lengths      #wavevector
+        self.omegas = self.ks*self.c 
         
         if light_spectrum is None:
-            self.light_spectrum = Spectrum( object_spectrum.wave_lengths, np.ones(l) )
+            self.light_spectrum = Spectrum( wave_lengths, np.ones(l) )
         else:
             self.light_spectrum = light_spectrum
     
         if spectral_sensitivity is None:
-            self.spectral_sensitivity = Spectrum( object_spectrum.wave_lengths, np.ones(l) )
+            self.spectral_sensitivity = Spectrum( wave_lengths, np.ones(l) )
         else:
-            self.spectral_sensitivity = spectral_sensitivity
+            self.spectral_sensitivity = spectral_sensitivity   
+        
+    def compute_light_field(self):
+        """Compute the incoming light field."""
+        raise NotImplementedError( "This function should be implemented" )        
+        
+    def compute_intensity(self):
+        """Compute the intensity of the interference field as well as the reflectivity of the Lippmann plate"""
+        raise NotImplementedError( "This function should be implemented" )
+        
+    def compute_new_spectrum(self):
+        """Compute the intensity of the interference field as well as the reflectivity of the Lippmann plate"""
+        raise NotImplementedError( "This function should be implemented" )
             
-        self.E            = None
-        self.reflectivity = None
-        self.intensity    = None
-        
-        #speed of wave front
-        self.C = 299792458/n
-        self.epsilon_0 = 8.8541878176E-12
-        
-        
-    def get_electric_field(self,t,z,display=False):
-        """Compute the electric field at time t and depth z
-        
-        Args:
-            t:              time as an nparray
-            z:              depth as an nparray
-            display (bool): whether or not to display it (default: False)
-            
-        Returns:
-            The corresponding 2D electric field in a 2D nparray
-        """
 
-        if self.E is None:
-
-            t_grid, z_grid = np.meshgrid(t,z)
-            lambdas = self.object_spectrum.wave_lengths  
-            nu      = self.C/lambdas
+    @property
+    def I(self):
+        if self._I is None:
+            self.compute_intensity()
+        return self._I
+        
+    @I.setter
+    def I(self, value):
+        self._I = value
+        
+    @property
+    def R(self):
+        if self._R is None:
+            self.compute_intensity()
+        return self._R
     
-            self.E = np.zeros(t_grid.shape)
-            
-            y = np.zeros((len(lambdas), t_grid.shape[0], t_grid.shape[1]))
-            
-            for idx, lambd in enumerate(lambdas):
-                #freq = self.C/lambd
-                ang_wavenumber = 2*np.pi/lambd
-                
-                y[idx, :, :] = np.sqrt( self.light_spectrum.intensities[idx]*self.object_spectrum.intensities[idx] ) * \
-                               np.sin(self.n*z_grid*ang_wavenumber)*np.sin(t_grid*self.C*ang_wavenumber)
-            
-            #numerical integration
-            self.E = 2*self.E0 * np.trapz(y=y, x=nu, axis=0)
-            
-        if display:
-            self.show_electric_field(t,z)
-         
-        return self.E
-            
-    def get_intensity(self, z, integration_method='trapz'):
-        """Compute the electric field at depth z
+    @R.setter
+    def R(self, value):
+        self._R = value
         
-        Args:
-            z:                  depth as an nparray
-            integration_method: can be either 'trapz', 'sum', or 'simps' (default: 'trapz')
-            
-        Returns:
-            The corresponding intensity as a nparray
-        """
+    @property
+    def U(self):
+        if self._U is None:
+            self.compute_light_field()
+        return self._U
         
-        if not self.intensity is None:
-            return self.intensity
+    @U.setter
+    def U(self, value):
+        self._U = value
+        
+    #I = property(fget=_get_intensity, fset=_set_intensity, doc="""Gets or sets the intensity.""")
+    #R = property(fget=_get_reflectivity, fset=_set_reflectivity, doc="""Gets or sets the reflectivity.""")
+    #U = property(fget=_get_light_field, fset=_set_light_field, doc="""Gets or sets the light field.""")
 
-        lambdas = self.object_spectrum.wave_lengths
-        nus     = self.C/lambdas
-        
-        y = np.zeros((len(lambdas), len(z)))
-        
-        for idx, lambd in enumerate(lambdas):
-#            sines = np.sin(2*np.pi*self.n*z/lambd)**2
-            sines = 1.0 -np.cos(4*np.pi*self.n*z/lambd)
-            
-            y[idx, :] = (self.light_spectrum.intensities[idx]*self.object_spectrum.intensities[idx])*\
-                        sines
 
-        #numerical integration         
-#        I = self.E0**2*self.C*self.n*self.epsilon_0 * np.trapz(y=y, x=lambdas, axis=0)
-        
-        if integration_method == 'trapz':
-            I = self.E0**2*self.n * np.trapz(y=y, x=nus, axis=0)
-        elif integration_method == 'sum':
-            I = np.sum(y, axis=0)/len(nus)
-        else:
-            I = self.E0**2*self.n * integrate.simps(y=y, x=nus, axis=0)
-        
-        self.intensity = Spectrogram(z, I)
-        return self.intensity
-        
-    def get_reflectivity(self, z, integration_method='trapz'):
-        """Compute the reflectivity function of the plate at depth z
-        
-        Args:
-            z:                  depth as an nparray
-            integration_method: can be either 'trapz', 'sum', or 'simps' (default: 'trapz')
-            
-        Returns:
-            The corresponding reflectivity as a nparray
-        """
-        
-        if not self.reflectivity is None:
-            return self.reflectivity
-        
-        lambdas = self.object_spectrum.wave_lengths
-        nus     = self.C/lambdas        
-        
-        y = np.zeros((len(lambdas), len(z)))
-        
-        for idx, lambd in enumerate(lambdas):     
-            sines = np.sin(2*np.pi*self.n*z/lambd)**2
-#            sines = 0.5*(-np.cos(4*np.pi*self.n*z/lambd) )
-            y[idx, :] = (self.light_spectrum.intensities[idx]*self.object_spectrum.intensities[idx]*self.spectral_sensitivity.intensities[idx]) * \
-                        sines
-                        
-#            y[idx, :] = -(self.light_spectrum.intensities[idx]*self.object_spectrum.intensities[idx]*self.spectral_sensitivity.intensities[idx]) * \
-#                        np.cos(4*np.pi*self.n*z/lambd)
-            
-        
-        if integration_method == 'trapz':
-            R = self.E0**2*self.n*self.epsilon_0 * np.trapz(y, x=nus, axis=0)
-        elif integration_method == 'sum':
-            R = np.sum(y, axis=0)/len(nus)
-        else:
-            R = self.E0**2*self.n*self.epsilon_0 * integrate.simps(y, x=nus, axis=0)
-        
-        
-        self.reflectivity = Spectrogram(z,R)
-        return self.reflectivity
-        
-    def re_illuminate(self, t, new_lambdas=None, new_light_spectrum=None, integration_method='trapz'):
-        """Compute the spectrum back from the reflectivity function of the plate
-        
-        Args:
-            t (double):         time (at which we evaluate the electric field)
-            new_lambdas:        frequencies of evaluation of the spectrum (default: None, which reuses the one from the input wave)
-            light_spectrum:     the spectrum of the light illuminating the plate (default: None, which is equivalent to all ones)            
-            integration_method: can be either 'trapz', 'sum', or 'simps' (default: 'simps')
-            
-        Returns:
-            The spectrum of the electric field and of the intensity
-        """
-        
-#        epsilon_0 = 20E22
-        epsilon_0 = 8.8541878176E-12
-        epsilon_0 = 1.
-        depths    = self.reflectivity.depths
-        
-        if new_lambdas is None:
-            new_lambdas = self.object_spectrum.wave_lengths
-        if new_light_spectrum is None:
-            new_light_spectrum = self.light_spectrum
-            
-        if not self.reflectivity is None:
-            self.get_reflectivity(depths)
-        
-        y1 = np.zeros((len(depths), len(new_lambdas)))
-        y2 = np.zeros((len(depths), len(new_lambdas)))
-        
-        freqs = self.C/new_lambdas
-        for idx, z in enumerate(depths):   
-            y1[idx, :] = np.sqrt(new_light_spectrum.intensities)*self.reflectivity.intensities[idx]*np.sin( 4*np.pi*freqs*t - 4*np.pi*self.n/new_lambdas*z ) 
-            y2[idx, :] = self.reflectivity.intensities[idx]*np.cos(4*np.pi*self.n/new_lambdas*z )
-        
-        if integration_method == 'trapz':
-            E_new = self.E0*np.trapz(y=y1, x=depths, axis=0)
-            I_new = self.n*self.C*epsilon_0/2.0*new_light_spectrum.intensities*self.E0**2* \
-                    np.trapz(y=y2, x=depths, axis=0)**2
-        elif integration_method == 'sum':
-            E_new = np.sum(y1, axis=0)
-            I_new = ( np.sum(y2, axis=0)/(2.*np.pi) )**2
-        else:
-            E_new = self.E0*integrate.simps(y=y1, x=depths, axis=0)
-            I_new = self.n*self.C*epsilon_0/2.0*new_light_spectrum.intensities*self.E0**2* \
-                    integrate.simps(y=y2, x=depths, axis=0)**2
-        
-        return Spectrum(new_lambdas, E_new), Spectrum(new_lambdas, I_new)
-        
-   
-    def show_electric_field(self,t,z):
-        """Display the elctric field
-        
-        Args:
-            t: time as an nparray
-            z: depth as an nparray
-        """
-               
-        fig, ax = plt.subplots()
-        ax.set_ylim([np.min(self.E),np.max(self.E)])
-        self.line, = ax.plot(z, self.E[:,0])
+#class LippmannPlate(object):
+#    """Class defining a Lippmann object for a 2D image (i.e. with spatial variation)"""
 
-        ani = animation.FuncAnimation(fig, self.animate, t.shape[0], interval=25, blit=False)
-        ani.save('electric_field.mp4')      
+
         
-        plt.show()
         
-    def animate(self, t_idx):
-        #print t_idx
-        self.line.set_ydata(self.E[:,t_idx])
-        return self.line
-        
-    
        
 class LippmannPlate(object):
     """Class defining a Lippmann object for a 2D image (i.e. with spatial variation)"""
@@ -267,9 +119,9 @@ class LippmannPlate(object):
             self.spectral_sensitivity = spectral_sensitivity   
             
         if r is None:
-            n_space = 1000
+            n_space = 2500
             self.r = np.zeros([n_space, 3])
-            self.r[:,2] = np.linspace(0, 500*390E-9, n_space)
+            self.r[:,2] = np.linspace(0, 250.0E-6, n_space)
         else:
             self.r = r
         
@@ -318,7 +170,7 @@ class LippmannPlate(object):
         else:
             return w_f
         
-    def compute_intensity(self, damp=True):
+    def compute_intensity(self):
         
         if self.intensities is None:
             
@@ -347,13 +199,6 @@ class LippmannPlate(object):
 #                    self.reflectances[x, y,:] = 2*self.c*self.epsilon_0*np.trapz(y=integrand_r, x=self.spectrums.wave_lengths, axis=0)
                     self.intensities[x, y,:]  = np.trapz(y=integrand_i, x=self.spectrums.wave_lengths, axis=0)
                     self.reflectances[x, y,:] = np.trapz(y=integrand_r, x=self.spectrums.wave_lengths, axis=0)
-                    
-                    if damp:
-                        l = self.r.shape[0]
-                        l_pct = int(0.2*l)
-                        self.intensities[x, y, -l_pct:]  *= np.cos(np.linspace(0, np.pi/2, l_pct)) 
-                        self.reflectances[x, y, -l_pct:] *= np.cos(np.linspace(0, np.pi/2, l_pct))
-
             
     
     def compute_new_spectrum(self, wave_lengths=None):
@@ -376,7 +221,7 @@ class LippmannPlate(object):
                 sys.stdout.write("\rComputing new spectrum: %.2f %%" %perc)
                 sys.stdout.flush() 
                 
-                for y in range(self.height):
+                for y in xrange(self.height):
                     
                     integrand = self.reflectances[x, y, :, np.newaxis] * cosines.T
                     
