@@ -17,8 +17,8 @@ class GuiManager(object):
         self.lippmann = lippmann
         
         if normalize_spectrums:
-            self.spectrum_max_value = np.max(lippmann.spectrums.intensities)
-            self.spectrum_new_max_value = np.max(lippmann.new_spectrums.intensities)
+            self.spectrum_max_value = np.max(lippmann.spectrum.intensities)
+            self.spectrum_new_max_value = np.max(lippmann.I_r.intensities)
 #            self.spectrum_new_max_value = 0.
         else:
             self.spectrum_max_value = 0.
@@ -113,7 +113,7 @@ class GuiManager(object):
             
     def plot_image(self):
 #        image = self.lippmann.rgb_ref
-        image = self.lippmann.spectrums.rgb_colors
+        image = self.lippmann.spectrum.rgb_colors
         
         #gamma correction
         if self.gamma_correct:
@@ -134,7 +134,7 @@ class GuiManager(object):
         
     def plot_new_image(self):
 
-        image = self.lippmann.new_spectrums.rgb_colors
+        image = self.lippmann.I_r.rgb_colors
                 
         #gamma correction
         if self.gamma_correct:
@@ -164,13 +164,13 @@ class GuiManager(object):
     def plot_reflectance(self):
 
         z           = self.lippmann.r[:,2]
-        reflectance = self.lippmann.reflectances[self.pixel_index_2D[0], self.pixel_index_2D[1],:]
+        reflectance = self.lippmann.R[self.pixel_index_2D[0], self.pixel_index_2D[1],:]
         
         self.spectrogram_ax = plt.subplot(self.gs[:,2])
         self.spectrogram_ax.clear()
         
         if self.lim_x is None:
-            self.lim_x = np.max( self.lippmann.reflectances)      
+            self.lim_x = np.max( self.lippmann.R)      
         
         self.spectrogram_ax.plot(reflectance, z)
         self.spectrogram_ax.set_ylim([0., np.max(z)])
@@ -182,15 +182,15 @@ class GuiManager(object):
         
     def plot_spectrums(self):
         
-        spectrum = self.lippmann.spectrums.get_spectrum(self.pixel_index_2D[0], self.pixel_index_2D[1])
+        spectrum = self.lippmann.spectrum.get_spectrum(self.pixel_index_2D[0], self.pixel_index_2D[1])
         self.spectrum_ax = plt.subplot(self.gs[0,1])
-        spectrum_rgb = self.lippmann.spectrums.rgb_colors[self.pixel_index_2D[0], self.pixel_index_2D[1], :]
+        spectrum_rgb = self.lippmann.spectrum.rgb_colors[self.pixel_index_2D[0], self.pixel_index_2D[1], :]
         title = 'Spectrum (RGB = [' + format(spectrum_rgb[0], '.2f') + ', ' + format(spectrum_rgb[1], '.2f') + ', ' + format(spectrum_rgb[2], '.2f') + '])'
         spectrum.show(ax=self.spectrum_ax, title=title, y_max=self.spectrum_max_value)
         
-        new_spectrum = self.lippmann.new_spectrums.get_spectrum(self.pixel_index_2D[0], self.pixel_index_2D[1])
+        new_spectrum = self.lippmann.I_r.get_spectrum(self.pixel_index_2D[0], self.pixel_index_2D[1])
         self.new_spectrum_ax = plt.subplot(self.gs[1,1])
-        new_spectrum_rgb = np.sqrt(self.lippmann.new_spectrums.rgb_colors[self.pixel_index_2D[0], self.pixel_index_2D[1], :])        
+        new_spectrum_rgb = np.sqrt(self.lippmann.I_r.rgb_colors[self.pixel_index_2D[0], self.pixel_index_2D[1], :])        
         new_title = 'Spectrum new (RGB = [' + format(new_spectrum_rgb[0], '.2f') + ', ' + format(new_spectrum_rgb[1], '.2f') + ', ' + format(new_spectrum_rgb[2], '.2f') + '])'   
         new_spectrum.show(ax=self.new_spectrum_ax, title=new_title, sqrt=True, y_max=self.spectrum_new_max_value)        
         

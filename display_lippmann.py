@@ -62,6 +62,10 @@ lippmann_plate = load_multispectral_image_CAVE(path_CAVE)
 #Read an RGB image
 #lippmann_plate = create_multispectral_image_discrete(path_RGB, N_samples)
 
+lippmann_plate.spectrum.intensities = lippmann_plate.spectrum.intensities[:200, :200, :]
+lippmann_plate.height = 200
+lippmann_plate.width  = 200
+
 lippmann_plate.compute_intensity()
 
 #for i in range(30,lippmann_plate.reflectances.shape[2]):
@@ -71,15 +75,15 @@ lippmann_plate.compute_intensity()
 
 
 #compute intensity and new spectrum
-lippmann_plate.compute_new_spectrum()
+lippmann_plate.replay()
 
 
 #shift of the spectrum towards the blues
 
 #lippmann_plate.new_spectrums.blue_shift(1./np.cos(theta_o), extrapolation='cste')
 
-lippmann_plate.spectrums.compute_rgb()
-lippmann_plate.new_spectrums.compute_rgb(sqrt=True)
+lippmann_plate.spectrum.compute_rgb()
+lippmann_plate.I_r.compute_rgb(sqrt=True)
 
 
 #gui_manager = GuiManager(lippmann_plate, normalize_spectrums=True, gamma_correct=True)

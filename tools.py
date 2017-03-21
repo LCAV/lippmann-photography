@@ -49,7 +49,7 @@ def load_multispectral_image_PURDUE(path):
         data = band.GetDataset().ReadAsArray()[idx]
 
         #reduce the shape        
-        lippmann_plate.spectrums[idx] = data[shape[0]//2:, :].transpose()
+        lippmann_plate.spectrum[idx] = data[shape[0]//2:, :].transpose()
 
 
     return lippmann_plate
@@ -65,7 +65,7 @@ def load_multispectral_image_CAVE(path, image_type='png'):
     
     wavelengths = np.linspace(400E-9, 700E-9, n_bands)
     
-    lippmann_plate = LippmannPlate(wavelengths, image.shape[0], image.shape[1])
+    lippmann_plate = LippmannContinuous(wavelengths, image.shape[0], image.shape[1])
     lippmann_plate.rgb_ref = misc.imread(glob.glob(path + '/*.bmp')[0]).astype(float)/255.0
     
     idx = 0
@@ -76,7 +76,7 @@ def load_multispectral_image_CAVE(path, image_type='png'):
         #gamma 'uncorrection'
 #        image = np.power(image, 2.2)
 
-        lippmann_plate.spectrums[idx] = image
+        lippmann_plate.spectrum[idx] = image
         
         
         
@@ -89,10 +89,10 @@ def load_multispectral_image_SCIEN(path):
     wavelengths = mat_data['wave'].flatten()*1E-9
     intensities = mat_data['photons']
         
-    lippmann_plate = LippmannPlate(wavelengths, intensities.shape[0], intensities.shape[1])
-    lippmann_plate.spectrums = Spectrums(wavelengths, intensities) 
+    lippmann_plate = LippmannContinuous(wavelengths, intensities.shape[0], intensities.shape[1])
+    lippmann_plate.spectrum = Spectrums(wavelengths, intensities) 
     
-    lippmann_plate.rgb_ref = lippmann_plate.spectrums.compute_rgb()
+    lippmann_plate.rgb_ref = lippmann_plate.spectrum.compute_rgb()
     
     return lippmann_plate
     
@@ -103,10 +103,10 @@ def load_multispectral_image_Suwannee(path):
     wavelengths = mat_data['HDR']['wavelength'][0][0][0]*1E-9
     intensities = mat_data['I']
         
-    lippmann_plate = LippmannPlate(wavelengths, intensities.shape[0], intensities.shape[1])
-    lippmann_plate.spectrums = Spectrums(wavelengths, intensities) 
+    lippmann_plate = LippmannContinuous(wavelengths, intensities.shape[0], intensities.shape[1])
+    lippmann_plate.spectrum = Spectrums(wavelengths, intensities) 
     
-    lippmann_plate.rgb_ref = lippmann_plate.spectrums.compute_rgb()
+    lippmann_plate.rgb_ref = lippmann_plate.spectrum.compute_rgb()
     
     return lippmann_plate
     
@@ -118,7 +118,7 @@ def load_multispectral_image_Gamaya(path, filename):
         
     gtif = gdal.Open(path + '/' + filename)
     shape = gtif.GetRasterBand(1).GetDataset().ReadAsArray()[0].shape    
-    lippmann_plate = LippmannPlate(wavelengths, shape[0], shape[1])
+    lippmann_plate = LippmannContinuous(wavelengths, shape[0], shape[1])
     
     for idx in range( gtif.RasterCount ):
         band = gtif.GetRasterBand(idx+1)
@@ -127,7 +127,7 @@ def load_multispectral_image_Gamaya(path, filename):
         data = np.nan_to_num(data)
         data[data<0] = 0.
         
-        lippmann_plate.spectrums[idx] = data
+        lippmann_plate.spectrum[idx] = data
     
     return lippmann_plate
     
@@ -153,10 +153,10 @@ def load_multispectral_image_HySpex(path):
     intensity -= np.min(intensity)
     intensity /= np.max(intensity)
     
-    lippmann_plate = LippmannPlate(wavelengths, intensity.shape[0], intensity.shape[1])
-    lippmann_plate.spectrums = Spectrums(wavelengths, intensity) 
+    lippmann_plate = LippmannContinuous(wavelengths, intensity.shape[0], intensity.shape[1])
+    lippmann_plate.spectrum = Spectrums(wavelengths, intensity) 
     
-    lippmann_plate.rgb_ref = lippmann_plate.spectrums.compute_rgb()
+    lippmann_plate.rgb_ref = lippmann_plate.spectrum.compute_rgb()
     
     return lippmann_plate
 
@@ -167,11 +167,11 @@ def create_multispectral_image_discrete(path, N_prime):
     im       = misc.imread(path).astype(float)/255.0
     
     #create Lippmann plate object
-    lippmann_plate = LippmannPlateDiscrete( N_prime, im.shape[0], im.shape[1])    
+    lippmann_plate = LippmannDiscrete( N_prime, im.shape[0], im.shape[1])    
     
     #comppute the spectrum
     im_xyz   = ct.from_rgb_to_xyz(im)   
-    lippmann_plate.spectrums.intensities = ct.from_xyz_to_spectrum(im_xyz, lippmann_plate.lambdas)
+    lippmann_plate.spectrum.intensities = ct.from_xyz_to_spectrum(im_xyz, lippmann_plate.lambdas)
     
     return lippmann_plate
     
@@ -184,18 +184,18 @@ def create_multispectral_image(path, N_prime):
     wavelengths = np.linspace(390-9, 700E-9, N_prime)
     
     #crate Lippmann plate object
-    lippmann_plate = LippmannPlate( wavelengths, im.shape[0], im.shape[1])    
+    lippmann_plate = LippmannContinuous( wavelengths, im.shape[0], im.shape[1])    
     
     #comppute the spectrum
     im_xyz   = ct.from_rgb_to_xyz(im)   
-    lippmann_plate.spectrums.intensities = ct.from_xyz_to_spectrum(im_xyz, wavelengths)
+    lippmann_plate.spectrum.intensities = ct.from_xyz_to_spectrum(im_xyz, wavelengths)
     
     return lippmann_plate
     
     
 def extract_layers_for_artwork(lippmann_plate, row_idx, subtract_mean=True, normalize=False, negative=False):
     
-    plt.imsave('image_slice.png', lippmann_plate.spectrums.rgb_colors[:row_idx+1,:,:])
+    plt.imsave('image_slice.png', lippmann_plate.spectrum.rgb_colors[:row_idx+1,:,:])
     
     r   = lippmann_plate.reflectances
     min_r = np.min(r)

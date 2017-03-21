@@ -142,7 +142,7 @@ class Spectrums(object):
         self.intensities[x, y, :] = value
     
         
-class Spectrogram(object):
+class Scale(object):
     
     def __init__(self, depths, intensities):
         
