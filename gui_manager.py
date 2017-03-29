@@ -85,6 +85,7 @@ class GuiManager(object):
                 self.plot_spectrums()
                 self.plot_reflectance()
                 self.plot_new_image()
+                plt.show()
                 
     def key_pressed(self, event):
         n_x = self.lippmann.width

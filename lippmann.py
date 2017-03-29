@@ -139,7 +139,7 @@ class Lippmann(object):
         
 
 class LippmannContinuous(Lippmann):
-     """Class defining a 'continuous' Lippmann object"""
+    """Class defining a 'continuous' Lippmann object"""
     
     def __init__(self, wavelengths, n_x, n_y, r=None, direction=np.array([0.0, 0.0, 1.0]), light_spectrum=None, spectral_sensitivity=None, n=1.0, E_0=1.0, phi_0=np.pi/2.0):
 
@@ -243,7 +243,7 @@ class LippmannContinuous(Lippmann):
     
         
 class LippmannDiscrete(Lippmann):
-     """Class defining a discrete Lippmann object"""
+    """Class defining a discrete Lippmann object"""
     
     def __init__(self, N_prime, n_x, n_y, lambda_min=390E-9, lambda_max=700E-9, light_spectrum=None, spectral_sensitivity=None, n=1.0, E_0=1.0, phi_0=np.pi/2.0):
         
