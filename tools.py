@@ -1,10 +1,16 @@
 # -*- coding: utf-8 -*-
+import warnings
 import glob
 import numpy as np
 from scipy import misc, io
 import matplotlib.pyplot as plt
 from skimage.transform import PiecewiseAffineTransform, warp
-from osgeo import gdal
+gdal_available = True
+try:
+    from osgeo import gdal
+except ImportError as gdal_import_error:
+    gdal_available = False
+    warnings.warn(gdal_import_error.msg)
 import csv
 import h5py
 
@@ -30,30 +36,32 @@ def from_viewing_angle_to_theta_i(theta_2, alpha, n1, n2, deg=True):
 
 
 def load_multispectral_image_PURDUE(path):
-    
+    if not gdal_available:
+        raise ImportError("to use PURDUE image module osgeo is required (need gdal.Open)")
+
     gtif = gdal.Open( path + "/data.tif" )
-    
+
     #extract wavelengths
     wavelength_data = np.genfromtxt( path + "/wavelengths.txt", delimiter=' ')
     indices = np.where( 1-np.isnan(wavelength_data[:,2]) )
     wavelengths = wavelength_data[indices, 1].flatten()*1E-9
-        
-    shape = gtif.GetRasterBand(1).GetDataset().ReadAsArray()[0].shape    
+
+    shape = gtif.GetRasterBand(1).GetDataset().ReadAsArray()[0].shape
     lippmann_plate = LippmannPlate(wavelengths, shape[1], shape[0]//2)
 #    lippmann_plate = LippmannPlate(wavelengths, 1, 1)
-    
+
     for idx in range( gtif.RasterCount ):
         print("[ GETTING BAND ]: ", idx)
         band = gtif.GetRasterBand(idx+1)
-        
+
         data = band.GetDataset().ReadAsArray()[idx]
 
-        #reduce the shape        
+        #reduce the shape
         lippmann_plate.spectrum[idx] = data[shape[0]//2:, :].transpose()
 
 
     return lippmann_plate
-    
+
 
 def load_multispectral_image_CAVE(path, image_type='png'):
     
@@ -111,6 +119,8 @@ def load_multispectral_image_Suwannee(path):
     return lippmann_plate
     
 def load_multispectral_image_Gamaya(path, filename):
+    if not gdal_available:
+        raise ImportError("to use Gamaya image module osgeo is required (need gdal.Open)")
     
     with open(path + '/wavs.csv', 'r') as csvfile:
         reader = csv.reader(csvfile, delimiter=',', quotechar='|')

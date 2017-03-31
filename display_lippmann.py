@@ -4,6 +4,7 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+import sys
 
 from gui_manager import GuiManager
 
@@ -22,20 +23,20 @@ theta_o   = np.pi/4.
 theta_o   = 25./180.*np.pi
 
 
-path_CAVE = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/CAVE - multispectral image database/fake_and_real_strawberries_ms/fake_and_real_strawberries_ms'
-#path_CAVE = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/CAVE - multispectral image database/fake_and_real_peppers_ms/fake_and_real_peppers_ms'
-#path_CAVE = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/CAVE - multispectral image database/egyptian_statue_ms/egyptian_statue_ms'
-#path_CAVE = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/CAVE - multispectral image database/pompoms_ms/pompoms_ms'
-#path_CAVE = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/CAVE - multispectral image database/fake_and_real_beers_ms/fake_and_real_beers_ms'
+path_CAVE = '/CAVE - multispectral image database/fake_and_real_strawberries_ms/fake_and_real_strawberries_ms'
+#path_CAVE = '/CAVE - multispectral image database/fake_and_real_peppers_ms/fake_and_real_peppers_ms'
+#path_CAVE = '/CAVE - multispectral image database/egyptian_statue_ms/egyptian_statue_ms'
+#path_CAVE = '/CAVE - multispectral image database/fake_and_real_beers_ms/fake_and_real_beers_ms'
+#path_CAVE = '/CAVE - multispectral image database/pompoms_ms/pompoms_ms'
 
-path_SCIEN = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/SCIEN - Stanford multispectral image database/StanfordTower.mat'
-path_Suwannee = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/Multispectral image databases/Gulf_Wetlands_Sample_Rad/Suwannee_0609-1331_rad_small.mat'
-path_PURDUE = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/Purdue - DC'
+path_SCIEN    = '/SCIEN - Stanford multispectral image database/StanfordTower.mat'
+path_Suwannee = '/Multispectral image databases/Gulf_Wetlands_Sample_Rad/Suwannee_0609-1331_rad_small.mat'
+path_PURDUE   = '/Purdue - DC'
 
-path_Gamaya = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/Gamaya/2016_12_12'
-path_HySpex = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/HySpex/2016_12_07/Lippmann-sample1_view-5deg_80000_us_1x_2016-12-07T172853_raw_rad_REF.mat'
-path_HySpex = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/HySpex/2016_12_07/Lippmann-sample1_view-35deg_80000_us_1x_2016-12-07T171000_raw_rad_REF.mat'
-path_HySpex = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/HySpex/2016_12_07/Lippmann-sample1_view-15deg_80000_us_1x_2016-12-07T171730_raw_rad_REF.mat'
+path_Gamaya = '/Gamaya/2016_12_12'
+path_HySpex = '/HySpex/2016_12_07/Lippmann-sample1_view-5deg_80000_us_1x_2016-12-07T172853_raw_rad_REF.mat'
+path_HySpex = '/HySpex/2016_12_07/Lippmann-sample1_view-35deg_80000_us_1x_2016-12-07T171000_raw_rad_REF.mat'
+path_HySpex = '/HySpex/2016_12_07/Lippmann-sample1_view-15deg_80000_us_1x_2016-12-07T171730_raw_rad_REF.mat'
 
 
 path_RGB = 'images/final_small2.jpg'
@@ -49,14 +50,19 @@ path_RGB = 'images/original_200_200.jpg'
 from tools import *
 from lippmann import *
 
-lippmann_plate = load_multispectral_image_CAVE(path_CAVE)
-#lippmann_plate = load_multispectral_image_SCIEN(path_SCIEN)
-#lippmann_plate = load_multispectral_image_Suwannee(path_Suwannee)
-#lippmann_plate = load_multispectral_image_PURDUE(path_PURDUE)
-#lippmann_plate = load_multispectral_image_Gamaya(path_Gamaya, 'Lippmann_crop.tif')
-#lippmann_plate = load_multispectral_image_HySpex(path_HySpex)
+dir = ".."
+if len(sys.argv)>1:
+    dir = sys.argv[1]
+print(dir)
 
-#Convert to discrete uniformly-sampled spectrums
+lippmann_plate = load_multispectral_image_CAVE(dir + path_CAVE)
+#lippmann_plate = load_multispectral_image_SCIEN(dir + path_SCIEN)
+#lippmann_plate = load_multispectral_image_Suwannee(dir + path_Suwannee)
+#lippmann_plate = load_multispectral_image_PURDUE(dir + path_PURDUE)
+#lippmann_plate = load_multispectral_image_Gamaya(dir + path_Gamaya, 'Lippmann_crop.tif')
+#lippmann_plate = load_multispectral_image_HySpex(dir + path_HySpex)
+
+"""Convert to discrete uniformly-sampled spectrums"""
 lippmann_plate = lippmann_plate.to_uniform_freq(N_samples)
 
 #Read an RGB image
@@ -74,7 +80,7 @@ lippmann_plate.compute_intensity()
 #lippmann_plate.reflectances[:,:,50:] = 0.
 
 
-#compute intensity and new spectrum
+"""compute intensity and new spectrum"""
 lippmann_plate.replay()
 
 
