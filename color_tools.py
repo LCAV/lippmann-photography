@@ -81,7 +81,7 @@ def reconstruct_spectrum_from_rgb_shifts(rgb_images, angles, wavelengths):
     plt.figure()
     plt.plot(sensing_matrix.dot(spectrums.T)); plt.title('sensing matrix * spectrums')
     
-    return Spectrums(wavelengths, np.reshape(spectrums, [shape[0], shape[1], len(wavelengths)]) )
+    return Spectrum3D(wavelengths, np.reshape(spectrums, [shape[0], shape[1], len(wavelengths)]))
     
     
 

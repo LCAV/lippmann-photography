@@ -144,7 +144,7 @@ class LippmannContinuous(Lippmann):
     def __init__(self, wavelengths, n_x, n_y, r=None, direction=np.array([0.0, 0.0, 1.0]), light_spectrum=None, spectral_sensitivity=None, n=1.0, E_0=1.0, phi_0=np.pi/2.0):
 
         l = len(wavelengths)
-        spectrum = Spectrums(wavelengths, np.zeros([n_x, n_y, l]))
+        spectrum = Spectrum3D(wavelengths, np.zeros([n_x, n_y, l]))
         
         #default depth discretization
         if r is None:
@@ -199,7 +199,7 @@ class LippmannContinuous(Lippmann):
             if wavelengths is None:
                 wavelengths=self.wavelengths
                 
-            self._I_r = Spectrums( wavelengths, np.zeros([self.width, self.height, len(wavelengths)]) )
+            self._I_r = Spectrum3D(wavelengths, np.zeros([self.width, self.height, len(wavelengths)]))
    
             kTr     = self.r @ self.k_vec
             cosines = np.cos(2*self.n*kTr).T
@@ -268,9 +268,10 @@ class LippmannDiscrete(Lippmann):
         self.f           = np.arange(self.N)*self.df
         self.wavelengths     = 2./self.f[-self.N_prime:] 
 
-        direction = np.array([0.0, 0.0, 1.0])
+        if direction = None:
+            direction = np.array([0.0, 0.0, 1.0])
         
-        spectrum = Spectrums(self.wavelengths, np.zeros([n_x, n_y, N_prime]))
+        spectrum = Spectrum3D(self.wavelengths, np.zeros([n_x, n_y, N_prime]))
 
         super().__init__(spectrum, n_x, n_y, r=self.r, direction=direction, light_spectrum=light_spectrum, spectral_sensitivity=spectral_sensitivity, n=n, phi_0=phi_0)
 
@@ -309,7 +310,7 @@ class LippmannDiscrete(Lippmann):
             if self._R is None:
                 self.compute_intensity()           
                 
-            self._I_r = Spectrums( self.wavelengths, np.zeros([self.width, self.height, self.N_prime]) )
+            self._I_r = Spectrum3D(self.wavelengths, np.zeros([self.width, self.height, self.N_prime]))
    
    
             for x in range(self.width):

@@ -98,7 +98,7 @@ def load_multispectral_image_SCIEN(path):
     intensities = mat_data['photons']
         
     lippmann_plate = LippmannContinuous(wavelengths, intensities.shape[0], intensities.shape[1])
-    lippmann_plate.spectrum = Spectrums(wavelengths, intensities) 
+    lippmann_plate.spectrum = Spectrum3D(wavelengths, intensities)
     
     lippmann_plate.rgb_ref = lippmann_plate.spectrum.compute_rgb()
     
@@ -112,7 +112,7 @@ def load_multispectral_image_Suwannee(path):
     intensities = mat_data['I']
         
     lippmann_plate = LippmannContinuous(wavelengths, intensities.shape[0], intensities.shape[1])
-    lippmann_plate.spectrum = Spectrums(wavelengths, intensities) 
+    lippmann_plate.spectrum = Spectrum3D(wavelengths, intensities)
     
     lippmann_plate.rgb_ref = lippmann_plate.spectrum.compute_rgb()
     
@@ -164,7 +164,7 @@ def load_multispectral_image_HySpex(path):
     intensity /= np.max(intensity)
     
     lippmann_plate = LippmannContinuous(wavelengths, intensity.shape[0], intensity.shape[1])
-    lippmann_plate.spectrum = Spectrums(wavelengths, intensity) 
+    lippmann_plate.spectrum = Spectrum3D(wavelengths, intensity)
     
     lippmann_plate.rgb_ref = lippmann_plate.spectrum.compute_rgb()
     
