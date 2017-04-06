@@ -63,7 +63,7 @@ lippmann_plate = load_multispectral_image_CAVE(dir + path_CAVE)
 #lippmann_plate = load_multispectral_image_HySpex(dir + path_HySpex)
 
 """Convert to discrete uniformly-sampled spectrums"""
-lippmann_plate = lippmann_plate.to_uniform_freq(N_samples)
+# lippmann_plate = lippmann_plate.to_uniform_freq(N_samples)
 
 #Read an RGB image
 #lippmann_plate = create_multispectral_image_discrete(path_RGB, N_samples)
@@ -72,6 +72,10 @@ lippmann_plate.spectrum.intensities = lippmann_plate.spectrum.intensities[:200, 
 lippmann_plate.height = 200
 lippmann_plate.width  = 200
 
+# Add the direction of the recording (TODO Michalina it would be better to do it at the construction)
+direction = np.array([0.1,0.,0.9])
+direction = direction/np.linalg.norm(direction)
+lippmann_plate.direction = direction
 lippmann_plate.compute_intensity()
 
 #for i in range(30,lippmann_plate.reflectances.shape[2]):
@@ -81,7 +85,7 @@ lippmann_plate.compute_intensity()
 
 
 """compute intensity and new spectrum"""
-lippmann_plate.replay()
+lippmann_plate.replay(direction=direction)
 
 
 #shift of the spectrum towards the blues

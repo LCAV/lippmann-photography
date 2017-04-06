@@ -165,7 +165,7 @@ class LippmannContinuous(Lippmann):
         self._R   = np.zeros([self.width, self.height, self.r.shape[0]])
         
         kTr       = self.r @ self.k_vec
-        sines     = 0.5*(1 - np.cos(2.0*self.n*kTr))
+        sines     = 0.5*(1 - np.cos(2.0*self.n*kTr/self.direction[2]))/self.direction[2]
         
         i = self.light_spectrum.intensities[:, None] * sines.T
         r = self.spectral_sensitivity.intensities[:, None] * \
@@ -189,7 +189,7 @@ class LippmannContinuous(Lippmann):
         sys.stdout.write("\nIntensity computed!\n")
         
         
-    def replay(self, wavelengths=None):
+    def replay(self, wavelengths=None, direction=np.array([0.0, 0.0, 1.0])):
         
         if self._I_r is None:
             
@@ -198,11 +198,13 @@ class LippmannContinuous(Lippmann):
             
             if wavelengths is None:
                 wavelengths=self.wavelengths
+
+            direction = direction / np.linalg.norm(direction)
                 
             self._I_r = Spectrum3D(wavelengths, np.zeros([self.width, self.height, len(wavelengths)]))
    
             kTr     = self.r @ self.k_vec
-            cosines = np.cos(2*self.n*kTr).T
+            cosines = np.cos(2*self.n*kTr / direction[2]).T /direction[2]
                             
             for x in range(self.width):
                 perc = x/(self.width-1)*100
@@ -245,7 +247,7 @@ class LippmannContinuous(Lippmann):
 class LippmannDiscrete(Lippmann):
     """Class defining a discrete Lippmann object"""
     
-    def __init__(self, N_prime, n_x, n_y, lambda_min=390E-9, lambda_max=700E-9, light_spectrum=None, spectral_sensitivity=None, n=1.0, E_0=1.0, phi_0=np.pi/2.0):
+    def __init__(self, N_prime, n_x, n_y, lambda_min=390E-9, lambda_max=700E-9, direction=np.array([0.0, 0.0, 1.0]), light_spectrum=None, spectral_sensitivity=None, n=1.0, E_0=1.0, phi_0=np.pi/2.0):
         
         self.c = 299792458      
         
@@ -266,11 +268,8 @@ class LippmannDiscrete(Lippmann):
         self.r[:,2]      = self.z
         
         self.f           = np.arange(self.N)*self.df
-        self.wavelengths     = 2./self.f[-self.N_prime:] 
+        self.wavelengths     = 2./self.f[-self.N_prime:]
 
-        if direction = None:
-            direction = np.array([0.0, 0.0, 1.0])
-        
         spectrum = Spectrum3D(self.wavelengths, np.zeros([n_x, n_y, N_prime]))
 
         super().__init__(spectrum, n_x, n_y, r=self.r, direction=direction, light_spectrum=light_spectrum, spectral_sensitivity=spectral_sensitivity, n=n, phi_0=phi_0)
