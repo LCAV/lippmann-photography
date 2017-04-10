@@ -63,7 +63,7 @@ def load_multispectral_image_PURDUE(path):
     return lippmann_plate
 
 
-def load_multispectral_image_CAVE(path, image_type='png'):
+def load_multispectral_image_CAVE(path, image_type='png', direction=np.array([0,0,1])):
     
     list_images = glob.glob(path + '/*.' + image_type)
     
@@ -73,7 +73,7 @@ def load_multispectral_image_CAVE(path, image_type='png'):
     
     wavelengths = np.linspace(400E-9, 700E-9, n_bands)
     
-    lippmann_plate = LippmannContinuous(wavelengths, image.shape[0], image.shape[1])
+    lippmann_plate = LippmannContinuous(wavelengths, image.shape[0], image.shape[1], direction=direction)
     lippmann_plate.rgb_ref = misc.imread(glob.glob(path + '/*.bmp')[0]).astype(float)/255.0
     
     idx = 0

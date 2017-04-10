@@ -55,7 +55,14 @@ if len(sys.argv)>1:
     dir = sys.argv[1]
 print(dir)
 
-lippmann_plate = load_multispectral_image_CAVE(dir + path_CAVE)
+# Add the direction of the recording
+direction = np.array([0.1,0.,0.9])
+direction = direction/np.linalg.norm(direction)
+
+direction2 = np.array([0.2, 0., 0.8])
+direction2 = direction2/np.linalg.norm(direction2)
+
+lippmann_plate = load_multispectral_image_CAVE(dir + path_CAVE, direction=direction)
 #lippmann_plate = load_multispectral_image_SCIEN(dir + path_SCIEN)
 #lippmann_plate = load_multispectral_image_Suwannee(dir + path_Suwannee)
 #lippmann_plate = load_multispectral_image_PURDUE(dir + path_PURDUE)
@@ -72,10 +79,6 @@ lippmann_plate.spectrum.intensities = lippmann_plate.spectrum.intensities[:200, 
 lippmann_plate.height = 200
 lippmann_plate.width  = 200
 
-# Add the direction of the recording (TODO Michalina it would be better to do it at the construction)
-direction = np.array([0.1,0.,0.9])
-direction = direction/np.linalg.norm(direction)
-lippmann_plate.direction = direction
 lippmann_plate.compute_intensity()
 
 #for i in range(30,lippmann_plate.reflectances.shape[2]):
@@ -85,7 +88,7 @@ lippmann_plate.compute_intensity()
 
 
 """compute intensity and new spectrum"""
-lippmann_plate.replay(direction=direction)
+lippmann_plate.replay(direction=direction2)
 
 
 #shift of the spectrum towards the blues

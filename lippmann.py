@@ -18,6 +18,10 @@ from spectrum import *
 
 class Lippmann(object):
     """Class defining a generic Lippmann object"""
+
+    # TODO It may be better to have "build" function for Lippmann (which does all the logic "if none" then sth
+    # or rewrite the data reading functions co that they return spectrum, not lippmann
+    # or pass the lippmann to those functions as a argument (so it can be pre-filled with stuff) 
     
     def __init__(self, spectrum, n_x, n_y, r, direction=np.array([0.0, 0.0, 1.0]), light_spectrum=None, spectral_sensitivity=None, n=1.0, phi_0=np.pi/2.0, E_0=1):
         
@@ -148,6 +152,7 @@ class LippmannContinuous(Lippmann):
         
         #default depth discretization
         if r is None:
+            print("create r")
             n_space = 1000
             self.r = np.zeros([n_space, 3])
             self.r[:,2] = np.linspace(0, 100.0E-6, n_space)
@@ -164,8 +169,8 @@ class LippmannContinuous(Lippmann):
         self._I   = np.zeros([self.width, self.height, self.r.shape[0]])
         self._R   = np.zeros([self.width, self.height, self.r.shape[0]])
         
-        kTr       = self.r @ self.k_vec
-        sines     = 0.5*(1 - np.cos(2.0*self.n*kTr/self.direction[2]))/self.direction[2]
+        kTr       = self.r @ self.k_vec #what is r? Maybe we need only z component of it?
+        sines     = 0.5*(1 - np.cos(2.0*self.n*kTr))
         
         i = self.light_spectrum.intensities[:, None] * sines.T
         r = self.spectral_sensitivity.intensities[:, None] * \
@@ -202,9 +207,11 @@ class LippmannContinuous(Lippmann):
             direction = direction / np.linalg.norm(direction)
                 
             self._I_r = Spectrum3D(wavelengths, np.zeros([self.width, self.height, len(wavelengths)]))
-   
-            kTr     = self.r @ self.k_vec
-            cosines = np.cos(2*self.n*kTr / direction[2]).T /direction[2]
+
+            new_k_vec = self.k[None, :] * direction[:, None]
+
+            kTr     = self.r @ new_k_vec
+            cosines = np.cos(2*self.n*kTr).T
                             
             for x in range(self.width):
                 perc = x/(self.width-1)*100
