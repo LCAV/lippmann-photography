@@ -99,9 +99,9 @@ def propagation_arbitrary_layers_spectrum(ns, d, lambdas, plot=True):
     if plot:
         plt.figure()
         plt.plot(lambdas, total_reflectance)
-        plt.show()
         plt.title('Reflected spectrum with transmission matrices')
-        
+        plt.draw()
+
     return total_reflectance, total_transmittance
     
     
@@ -123,7 +123,7 @@ def dielectric_Brag_grating_spectrum(N, n1, n2, d1, d2, lambdas, plot=True):
     if plot:
         plt.figure()
         plt.plot(lambdas, total_reflectance)
-        plt.show()
+        plt.draw()
         
     return lambdas, total_reflectance, total_transmittance
 
@@ -171,8 +171,8 @@ def propagation_arbitrary_layers_Born_spectrum(ns, d, lambdas, plot=True):
     if plot:
         plt.figure()
         plt.plot(lambdas, total_reflectance)
-        plt.show()
         plt.title('Reflected spectrum with transmission matrices (Born method)')
+        plt.draw()
         
     return total_reflectance, total_transmittance
     
@@ -229,7 +229,8 @@ def generate_lippmann_refraction_indices(delta_intensity, n0=1.45, k0=0., mu_n=0
     
       
 if __name__ == '__main__':
-    
+    plt.ion()
+
     N = 1000
     n1 = 1.45
 #    n2 = 1.451
@@ -271,7 +272,6 @@ if __name__ == '__main__':
 
     plt.figure()
     plt.plot(depths, intensity)
-    plt.show()
     plt.title('Lippmann transform')
     
 #    plt.figure()
@@ -283,11 +283,13 @@ if __name__ == '__main__':
     plt.figure()
     plt.plot(lambdas, inverse_lippmann)
     plt.title('Inverse Lippmann transform')
-    
+
     propagation_arbitrary_layers_spectrum(ns, d=delta_z, lambdas=lambdas)
     propagation_arbitrary_layers_Born_spectrum(ns, d=delta_z, lambdas=lambdas)
-    
-    
+    plt.ioff()
+    plt.show()
+
+
     
     
     
