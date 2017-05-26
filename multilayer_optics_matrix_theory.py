@@ -46,6 +46,11 @@ def propagation_followed_by_boundary(n1, n2, phi):
 
 def propagation_arbitrary_layers(ns, k, d):
     
+    #start with an interface with air
+#    n1 = 1
+#    n2 = ns[0]
+#    M = 1/(2*n2)*np.array([[n2+n1, n2-n1], [n2-n1, n2+n1]])
+    
     M = np.eye(2)
     
     for i in range(len(ns)-1):
@@ -96,6 +101,8 @@ def propagation_arbitrary_layers_spectrum(ns, d, lambdas, plot=True):
         plt.plot(lambdas, total_reflectance)
         plt.show()
         plt.title('Reflected spectrum with transmission matrices')
+        
+    return total_reflectance, total_transmittance
     
     
 def dielectric_Brag_grating_spectrum(N, n1, n2, d1, d2, lambdas, plot=True):     
@@ -139,11 +146,13 @@ def propagation_arbitrary_layers_Born(ns, k, d):
         
         M = M @ Mi
         
-    m1 = (M[0,0]+M[0,1]*ns[-1])*ns[0] - (M[1,0]+M[1,1]*ns[-1])
-    m2 = (M[0,0]+M[0,1]*ns[-1])*ns[0] + (M[1,0]+M[1,1]*ns[-1])
+    p_1 = ns[0]
+    p_ell = ns[-1]
+    m1 = (M[0,0]+M[0,1]*p_ell)*p_1 - (M[1,0]+M[1,1]*p_ell)
+    m2 = (M[0,0]+M[0,1]*p_ell)*p_1 + (M[1,0]+M[1,1]*p_ell)
     
     r = m1/m2
-    t = 2*ns[0]/m2    
+    t = 2*p_1/m2    
         
     return np.abs(r)**2, ns[-1]/ns[0]*np.abs(t)**2
     
@@ -164,6 +173,8 @@ def propagation_arbitrary_layers_Born_spectrum(ns, d, lambdas, plot=True):
         plt.plot(lambdas, total_reflectance)
         plt.show()
         plt.title('Reflected spectrum with transmission matrices (Born method)')
+        
+    return total_reflectance, total_transmittance
     
     
 def generate_gaussian_spectrum(lambdas, mu=550E-9, sigma=30E-9):
@@ -176,7 +187,6 @@ def generate_gaussian_spectrum(lambdas, mu=550E-9, sigma=30E-9):
 def generate_rect_spectrum(lambdas, start=450E-9, end=560E-9):
     
     spectrum = np.zeros(len(lambdas))
-    
     spectrum[(lambdas >= start) & (lambdas <= end)] = 1
     
     return spectrum
@@ -236,27 +246,28 @@ if __name__ == '__main__':
 #    propagation_arbitrary_layers_spectrum(ns, d=d1)
     
     n0 = 1.45
-    c  = 299792458/n0
+    c0 = 299792458
+    c  = c0/n0
     N_omegas = 300
     delta_z = 10E-9
-    max_depth =  10E-6   
+    max_depth =  10E-6
     
     lambda_low = 390E-9; lambda_high = 700E-9
-    omega_low  = 2*np.pi*c/lambda_high; omega_high  = 2*np.pi*c/lambda_low 
+    omega_low  = 2*np.pi*c0/lambda_high; omega_high  = 2*np.pi*c0/lambda_low
     omegas  = np.linspace(omega_high, omega_low, 300)
-    lambdas = 2*np.pi*c/omegas
+    lambdas = 2*np.pi*c0/omegas
     
-    spectrum = generate_gaussian_spectrum(lambdas=lambdas, sigma=30E-9)
-    spectrum = generate_rect_spectrum(lambdas=lambdas)
-    spectrum = generate_mono_spectrum(lambdas, color=450E-9)
+    spectrum = generate_gaussian_spectrum(lambdas=lambdas, mu=400E-9, sigma=30E-9)
+    spectrum = generate_rect_spectrum(lambdas=lambdas, start=350E-9, end=450E-9)
+#    spectrum = generate_mono_spectrum(lambdas, color=440E-9)
     
     plt.figure()
     plt.plot(lambdas, spectrum)
     plt.title('Original object spectrum')
     
     depths = np.arange(0, max_depth, delta_z)
-    intensity, delta_intensity = lippmann_transform(lambdas, spectrum, depths)
-    ns = generate_lippmann_refraction_indices(delta_intensity, n0=n0, mu_n=0.1)
+    intensity, delta_intensity = lippmann_transform(lambdas/n0, spectrum, depths)
+    ns = generate_lippmann_refraction_indices(delta_intensity, n0=n0, mu_n=0.01)
 
     plt.figure()
     plt.plot(depths, intensity)
@@ -268,7 +279,7 @@ if __name__ == '__main__':
 #    plt.show()
 #    plt.title('Lippmann refraction coefficients')
     
-    inverse_lippmann = inverse_lippmann(intensity, lambdas, depths)
+    inverse_lippmann = inverse_lippmann(intensity, lambdas/n0, depths)
     plt.figure()
     plt.plot(lambdas, inverse_lippmann)
     plt.title('Inverse Lippmann transform')
