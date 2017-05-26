@@ -6,6 +6,8 @@ Created on Thu May 18 19:12:57 2017
 """
 
 import numpy as np
+import scipy as sp
+import scipy.stats
 import matplotlib.pyplot as plt
 
 plt.close('all')
@@ -36,12 +38,30 @@ def Fresnel_equations(n1, n2, theta1, polarized='s'):
         
 def propagation_followed_by_boundary(n1, n2, phi):
     
-     one_over_t = (n2+n1)*np.exp(1j*phi)
-     r_over_t = (n2-n1)*np.exp(1j*phi)
+    one_over_t = (n2+n1)*np.exp(1j*phi)
+    r_over_t = (n2-n1)*np.exp(1j*phi)
      
-     M = 1/(2*n2)*np.array([[np.conj(one_over_t), r_over_t], [np.conj(r_over_t), one_over_t]], dtype=complex)
-     return M
+    M = 1/(2*n2)*np.array([[np.conj(one_over_t), r_over_t], [np.conj(r_over_t), one_over_t]])
+    return M
+
+def propagation_arbitrary_layers(ns, k, d):
     
+    M = np.eye(2)
+    
+    for i in range(len(ns)-1):
+        n1  = ns[i]
+        n2  = ns[i+1]
+        phi = n1*k*d1
+        Mi  = propagation_followed_by_boundary(n1, n2, phi)
+        
+        M = M @ Mi
+        
+    S = from_S_to_M(M)
+    
+    t = S[0,0]
+    r = S[0,1]        
+        
+    return r, t
         
 def dielectric_Brag_grating(N, n1, n2, phi1, phi2):
 
@@ -57,11 +77,29 @@ def dielectric_Brag_grating(N, n1, n2, phi1, phi2):
     t = S[0,0]
     r = S[0,1]
     
-    return r, t
+    return r, t    
+
+def propagation_arbitrary_layers_spectrum(ns, d, lambdas, plot=True):
     
-def dielectric_Brag_grating_spectrum(N, n1, n2, d1, d2, resolution=1000, plot=True):     
+    ks = 2*np.pi/lambdas
     
-    lambdas = np.linspace(390E-9, 700E-9, resolution)
+    total_reflectance = []
+    total_transmittance = []    
+    
+    for k in ks:
+        r, t = propagation_arbitrary_layers(ns, k, d)
+        total_reflectance.append(np.abs(r)**2)
+        total_transmittance.append(np.abs(t)**2)
+        
+    if plot:
+        plt.figure()
+        plt.plot(lambdas, total_reflectance)
+        plt.show()
+        plt.title('Reflected spectrum with transmission matrices')
+    
+    
+def dielectric_Brag_grating_spectrum(N, n1, n2, d1, d2, lambdas, plot=True):     
+    
     k = 2*np.pi/lambdas
     
     phis1 = n1*k*d1
@@ -75,26 +113,170 @@ def dielectric_Brag_grating_spectrum(N, n1, n2, d1, d2, resolution=1000, plot=Tr
         total_reflectance.append(np.abs(r)**2)
         total_transmittance.append(np.abs(t)**2)
         
-    plt.figure()
-    plt.plot(lambdas, total_reflectance)
-    plt.show()
+    if plot:
+        plt.figure()
+        plt.plot(lambdas, total_reflectance)
+        plt.show()
         
     return lambdas, total_reflectance, total_transmittance
+
+
+def propagation_Born(n, phi):
+    
+    cos_phi = np.cos(phi)
+    sin_phi = np.sin(phi)
+    
+    M = np.array([[cos_phi, -1j/n*sin_phi], [-1j*n*sin_phi, cos_phi]])
+    return M
+    
+def propagation_arbitrary_layers_Born(ns, k, d):
+    
+    M = np.eye(2)
+    
+    for n in ns:
+        phi = n1*k*d1
+        Mi  = propagation_Born(n, phi)
+        
+        M = M @ Mi
+        
+    m1 = (M[0,0]+M[0,1]*ns[-1])*ns[0] - (M[1,0]+M[1,1]*ns[-1])
+    m2 = (M[0,0]+M[0,1]*ns[-1])*ns[0] + (M[1,0]+M[1,1]*ns[-1])
+    
+    r = m1/m2
+    t = 2*ns[0]/m2    
+        
+    return np.abs(r)**2, ns[-1]/ns[0]*np.abs(t)**2
+    
+def propagation_arbitrary_layers_Born_spectrum(ns, d, lambdas, plot=True):
+    
+    ks = 2*np.pi/lambdas
+    
+    total_reflectance = []
+    total_transmittance = []    
+    
+    for k in ks:
+        R, T = propagation_arbitrary_layers_Born(ns, k, d)
+        total_reflectance.append(R)
+        total_transmittance.append(T)
+        
+    if plot:
+        plt.figure()
+        plt.plot(lambdas, total_reflectance)
+        plt.show()
+        plt.title('Reflected spectrum with transmission matrices (Born method)')
     
     
-def dielectric_Brag_grating_spectrum_unmatched_medium(d, N):
+def generate_gaussian_spectrum(lambdas, mu=550E-9, sigma=30E-9):
     
-    pass
+    spectrum = sp.stats.norm(loc=mu, scale=sigma).pdf(lambdas)
+    
+    return spectrum
+    
+    
+def generate_rect_spectrum(lambdas, start=450E-9, end=560E-9):
+    
+    spectrum = np.zeros(len(lambdas))
+    
+    spectrum[(lambdas >= start) & (lambdas <= end)] = 1
+    
+    return spectrum
+    
+    
+def generate_mono_spectrum(lambdas, color=550E-9):
+    
+    spectrum = np.zeros(len(lambdas))    
+    spectrum[np.argmin(np.abs(lambdas-color))] = 1
+        
+    return spectrum
+    
+    
+def lippmann_transform(lambdas, spectrum, depths):
+    
+    two_k = 4*np.pi/lambdas    
+    
+    one_minus_cosines = 0.5*(1 - np.cos(two_k[None, :]*depths[:, None]))
+    cosines = 0.5*np.cos(two_k[None, :]*depths[:, None])
+    
+    intensity = np.trapz(one_minus_cosines*spectrum[None, :], two_k, axis=1)
+    delta_intensity = np.trapz(cosines*spectrum[None, :], two_k, axis=1)
+    return intensity, delta_intensity
+    
+    
+def inverse_lippmann(intensity, lambdas, depths):
+    
+    two_k = 4*np.pi/lambdas     
+    exponentials = np.exp(-1j*two_k[:,None]*depths[None,:])
+    return np.abs(1/depths[-1]*np.trapz(exponentials*intensity[None,:], depths, axis=1))**2
+    
+
+def generate_lippmann_refraction_indices(delta_intensity, n0=1.45, k0=0., mu_n=0.1, mu_k=0., s0=1):
+    
+    s = delta_intensity/np.max(delta_intensity)
+    s[s > s0] = s0
+    
+    n = n0*(1+mu_n*s) + 1j*k0*(1+mu_k*s)
+    return n
+    
       
 if __name__ == '__main__':
     
-    N = 10
+    N = 1000
     n1 = 1.45
-    n2 = 1.451
-    n2 = 2
-    d1 = 250E-9
-    d2 = 250E-9
-    
-    dielectric_Brag_grating_spectrum(N, n1, n2, d1, d2)
+#    n2 = 1.451
+    n2 = 1.8
+    d1 = 20E-9
+    d2 = 20E-9
 
+    ns = [n1, n2]*N
+    ns = np.random.rand(N)*0.1+1.45
+    ns = np.random.randn(N)*0.1+1.45
+    ns = np.linspace(1.45, 1.6, N)
+    
+#    dielectric_Brag_grating_spectrum(N, n1, n2, d1, d2)
+#    propagation_arbitrary_layers_spectrum(ns, d=d1)
+    
+    n0 = 1.45
+    c  = 299792458/n0
+    N_omegas = 300
+    delta_z = 10E-9
+    max_depth =  10E-6   
+    
+    lambda_low = 390E-9; lambda_high = 700E-9
+    omega_low  = 2*np.pi*c/lambda_high; omega_high  = 2*np.pi*c/lambda_low 
+    omegas  = np.linspace(omega_high, omega_low, 300)
+    lambdas = 2*np.pi*c/omegas
+    
+    spectrum = generate_gaussian_spectrum(lambdas=lambdas, sigma=30E-9)
+    spectrum = generate_rect_spectrum(lambdas=lambdas)
+    spectrum = generate_mono_spectrum(lambdas, color=450E-9)
+    
+    plt.figure()
+    plt.plot(lambdas, spectrum)
+    plt.title('Original object spectrum')
+    
+    depths = np.arange(0, max_depth, delta_z)
+    intensity, delta_intensity = lippmann_transform(lambdas, spectrum, depths)
+    ns = generate_lippmann_refraction_indices(delta_intensity, n0=n0, mu_n=0.1)
+
+    plt.figure()
+    plt.plot(depths, intensity)
+    plt.show()
+    plt.title('Lippmann transform')
+    
+#    plt.figure()
+#    plt.plot(depths, ns)
+#    plt.show()
+#    plt.title('Lippmann refraction coefficients')
+    
+    inverse_lippmann = inverse_lippmann(intensity, lambdas, depths)
+    plt.figure()
+    plt.plot(lambdas, inverse_lippmann)
+    plt.title('Inverse Lippmann transform')
+    
+    propagation_arbitrary_layers_spectrum(ns, d=delta_z, lambdas=lambdas)
+    propagation_arbitrary_layers_Born_spectrum(ns, d=delta_z, lambdas=lambdas)
+    
+    
+    
+    
     
