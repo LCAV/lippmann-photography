@@ -51,7 +51,7 @@ def propagation_arbitrary_layers(ns, k, d):
     for i in range(len(ns)-1):
         n1  = ns[i]
         n2  = ns[i+1]
-        phi = n1*k*d1
+        phi = n1*k*d
         Mi  = propagation_followed_by_boundary(n1, n2, phi)
         
         M = M @ Mi
@@ -134,7 +134,7 @@ def propagation_arbitrary_layers_Born(ns, k, d):
     M = np.eye(2)
     
     for n in ns:
-        phi = n1*k*d1
+        phi = n*k*d
         Mi  = propagation_Born(n, phi)
         
         M = M @ Mi
