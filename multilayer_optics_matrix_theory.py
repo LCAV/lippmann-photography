@@ -9,6 +9,7 @@ import numpy as np
 import scipy as sp
 import scipy.stats
 import matplotlib.pyplot as plt
+import math
 
 plt.close('all')
 
@@ -237,8 +238,8 @@ def blobs_to_ref_index(blob_z0, blob_delta_z, n0, delta_n, depths):
     n = np.ones_like(depths) * n0
     delta_z = depths[1] - depths[0]
     for z0 in blob_z0:
-        idx_min = int(z0 / delta_z)
-        idx_max = int((z0 + blob_delta_z) / delta_z)
+        idx_min = math.floor(z0 / delta_z)
+        idx_max = math.floor((z0 + blob_delta_z) / delta_z)
         n[idx_min:idx_max] = n[idx_min:idx_max] + delta_n
     return n
 
@@ -290,8 +291,9 @@ def step_pyramid_grating(steps_size, height, period, length):
         Returns beginnings of blobs """""
 
     base = np.arange(0, length, period)
+    factor = len(base)
     base = np.repeat(base, height, axis=0)
-    positions = np.array(list(range(height)) * int(length / period + 1)) * steps_size
+    positions = np.array(list(range(height)) * factor) * steps_size
     return positions + base
 
 
