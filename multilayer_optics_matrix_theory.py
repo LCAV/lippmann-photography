@@ -280,23 +280,6 @@ def blobs_to_matrices(begs, ends, n0, delta_n):
     return np.array(delta_z), np.array(n)
 
 
-def step_pyramid_grating(steps_size, height, period, length):
-    """"Calculate blob positions for pyramidal grating
-
-        step_size - distance between neighbouring blobs
-        height - number of blobs per pyramid
-        period - distance between beginnings of pyramids
-        length - leght of the plate
-
-        Returns beginnings of blobs """""
-
-    base = np.arange(0, length, period)
-    factor = len(base)
-    base = np.repeat(base, height, axis=0)
-    positions = np.array(list(range(height)) * factor) * steps_size
-    return positions + base
-
-
 if __name__ == '__main__':
     plt.ion()
 
