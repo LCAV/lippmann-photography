@@ -333,9 +333,9 @@ if __name__ == '__main__':
     #    plt.show()
     #    plt.title('Lippmann refraction coefficients')
 
-    inversed_lippmann = inverse_lippmann(intensity, lambdas / n0, depths)
+    inverted_lippmann = inverse_lippmann(intensity, lambdas / n0, depths)
     plt.figure()
-    plt.plot(lambdas, inversed_lippmann)
+    plt.plot(lambdas, inverted_lippmann)
     plt.title('Inverse Lippmann transform')
 
     propagation_arbitrary_layers_spectrum(ns, d=delta_z, lambdas=lambdas)
