@@ -86,7 +86,7 @@ def dielectric_Brag_grating(N, n1, n2, phi1, phi2):
 def propagation_arbitrary_layers_spectrum(ns, d, lambdas, plot=True):
     ks = 2 * np.pi / lambdas
     if not hasattr(d, "__iter__"):
-        d = np.ones_like(ns) * d
+        d = np.ones_like(lambdas) * d
 
     total_reflectance = []
     total_transmittance = []
@@ -296,7 +296,7 @@ def step_pyramid_grating(steps_size, height, period, length):
 
 
 if __name__ == '__main__':
-    plt.ion()
+#    plt.ion()
 
     N = 1000
     n1 = 1.45
@@ -327,8 +327,8 @@ if __name__ == '__main__':
     omegas = np.linspace(omega_high, omega_low, 300)
     lambdas = 2 * np.pi * c0 / omegas
 
-    spectrum = generate_gaussian_spectrum(lambdas=lambdas, mu=400E-9, sigma=30E-9)
-    spectrum = generate_rect_spectrum(lambdas=lambdas, start=350E-9, end=450E-9)
+    spectrum = generate_gaussian_spectrum(lambdas=lambdas, mu=500E-9, sigma=30E-9)
+#    spectrum = generate_rect_spectrum(lambdas=lambdas, start=350E-9, end=700E-9)
     #    spectrum = generate_mono_spectrum(lambdas, color=440E-9)
 
     plt.figure()
@@ -355,5 +355,5 @@ if __name__ == '__main__':
 
     propagation_arbitrary_layers_spectrum(ns, d=delta_z, lambdas=lambdas)
     propagation_arbitrary_layers_Born_spectrum(ns, d=delta_z, lambdas=lambdas)
-    plt.ioff()
+#    plt.ioff()
     plt.show()
