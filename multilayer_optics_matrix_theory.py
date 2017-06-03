@@ -9,6 +9,7 @@ import numpy as np
 import scipy as sp
 import scipy.stats
 import matplotlib.pyplot as plt
+import math
 
 plt.close('all')
 
@@ -237,8 +238,8 @@ def blobs_to_ref_index(blob_z0, blob_delta_z, n0, delta_n, depths):
     n = np.ones_like(depths) * n0
     delta_z = depths[1] - depths[0]
     for z0 in blob_z0:
-        idx_min = int(z0 / delta_z)
-        idx_max = int((z0 + blob_delta_z) / delta_z)
+        idx_min = math.floor(z0 / delta_z)
+        idx_max = math.floor((z0 + blob_delta_z) / delta_z)
         n[idx_min:idx_max] = n[idx_min:idx_max] + delta_n
     return n
 
@@ -277,22 +278,6 @@ def blobs_to_matrices(begs, ends, n0, delta_n):
         curr_d_n -= delta_n[end]
 
     return np.array(delta_z), np.array(n)
-
-
-def step_pyramid_grating(steps_size, height, period, length):
-    """"Calculate blob positions for pyramidal grating
-
-        step_size - distance between neighbouring blobs
-        height - number of blobs per pyramid
-        period - distance between beginnings of pyramids
-        length - leght of the plate
-
-        Returns beginnings of blobs """""
-
-    base = np.arange(0, length, period)
-    base = np.repeat(base, height, axis=0)
-    positions = np.array(list(range(height)) * int(length / period + 1)) * steps_size
-    return positions + base
 
 
 if __name__ == '__main__':
@@ -348,9 +333,9 @@ if __name__ == '__main__':
     #    plt.show()
     #    plt.title('Lippmann refraction coefficients')
 
-    inversed_lippmann = inverse_lippmann(intensity, lambdas / n0, depths)
+    inverted_lippmann = inverse_lippmann(intensity, lambdas / n0, depths)
     plt.figure()
-    plt.plot(lambdas, inversed_lippmann)
+    plt.plot(lambdas, inverted_lippmann)
     plt.title('Inverse Lippmann transform')
 
     propagation_arbitrary_layers_spectrum(ns, d=delta_z, lambdas=lambdas)
