@@ -94,15 +94,15 @@ def circle_array(radius, n, p0):
     return array
 
 
-def array2csv(time_period, pattern, filename,
-              newline=";", delimiter=","):
+def array2file(time_period, pattern, filename,
+               newline=";", delimiter=","):
     """"Writes array of points to the file in the format which can be then read
     by the program operating the piezo:
 
     time_period - time between instructions (0.2 ms tp 5ms)
     patter      - array (list) with points to write
                 (each point is 3 element list)
-    filename    - name of the .csv file
+    filename    - name of the .lipp (text) file
     newline     - marks end of line, should be ';'
     delimiter   - marks next number should be ','
     """""
@@ -117,4 +117,4 @@ if __name__ == '__main__':
 
     new_pattern = circle_array(radius=50, n=100, p0=[50, 0, 0])
     print(len(new_pattern))
-    array2csv(0.2, new_pattern, "circle_small.csv")
+    array2file(0.2, new_pattern, "circle_small.lipp")
