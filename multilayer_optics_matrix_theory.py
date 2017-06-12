@@ -224,7 +224,7 @@ def generate_lippmann_refraction_indices(delta_intensity, n0=1.45, k0=0., mu_n=0
     return n
 
 
-def blobs_to_ref_index(blob_z0, blob_delta_z, n0, delta_n, depths):
+def blobs_to_ref_index(blob_z0, blob_delta_z, n0, delta_n, depths, limit_n=None):
     """"Calculates the index of refraction at depths `depths`
 
         blob_z0         - array of beginnings of the blobs
@@ -232,26 +232,34 @@ def blobs_to_ref_index(blob_z0, blob_delta_z, n0, delta_n, depths):
         n0              - basic index of refraction
         delta_n         - change of index of refraction per blob (scalar)
         depths          - uniform array of distances
+        limit_n - if given, the maximal change of index of refraction possible,
+        then the change of index is normalized, so it does not exceed `limit_n`
 
         Returns n - list of indices corresponding to depths depths"""""
 
-    n = np.ones_like(depths) * n0
+    n = np.zeros_like(depths)
     delta_z = depths[1] - depths[0]
     for z0 in blob_z0:
         idx_min = math.floor(z0 / delta_z)
         idx_max = math.floor((z0 + blob_delta_z) / delta_z)
         n[idx_min:idx_max] = n[idx_min:idx_max] + delta_n
+    if limit_n is not None:
+        n = n/np.max(n)*limit_n
+    n = n+n0
     return n
 
 
-def blobs_to_matrices(begs, ends, n0, delta_n):
+def blobs_to_matrices(begs, ends, n0, delta_n, limit_n=None):
     """"Calculates set of distances and refractive indices
         begs    - beginnings of blobs
         ends    - ends of blobs
         n0      - basic index of refraction
         delta_n - change of index of refraction per blob (scalar or array)
+        limit_n - if given, the maximal change of index of refraction possible,
+        then the change of index is normalized, so it does not exceed `limit_n`
 
-        Returns detla_z - list of distances and n - list of corresponding indices"""""
+        Returns delta_z - list of distances
+        and n - list of corresponding indices"""""
 
     if not hasattr(delta_n, "__iter__"):
         delta_n = np.ones_like(begs) * delta_n
@@ -259,7 +267,7 @@ def blobs_to_matrices(begs, ends, n0, delta_n):
     delta_z = []
     n = []
     beg = 0
-    curr_d_n = n0
+    curr_d_n = 0
     curr_d_z = 0
     for end in range(len(ends)):
         while beg < len(begs) and begs[beg] < ends[end]:
@@ -277,7 +285,12 @@ def blobs_to_matrices(begs, ends, n0, delta_n):
         curr_d_z = ends[end]
         curr_d_n -= delta_n[end]
 
-    return np.array(delta_z), np.array(n)
+    n = np.array(n)
+    delta_z = np.array(delta_z)
+    if limit_n is not None:
+        n = n/np.max(n)*limit_n
+    n = n+n0
+    return delta_z, n
 
 
 if __name__ == '__main__':

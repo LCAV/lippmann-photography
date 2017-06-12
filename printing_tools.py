@@ -11,23 +11,6 @@ import numpy as np
     _array   - returns positions 3D at equal timestamps"""
 
 
-def step_pyramid_pattern(steps_size, height, period, length):
-    """"Calculate blob positions for pyramidal grating
-
-    step_size - distance between neighbouring blobs
-    height - number of blobs per pyramid
-    period - distance between beginnings of pyramids
-    length - leght of the plate
-
-    Returns beginnings of blobs"""""
-
-    base = np.arange(0, length, period)
-    factor = len(base)
-    base = np.repeat(base, height, axis=0)
-    positions = np.array(list(range(height)) * factor) * steps_size
-    return positions + base
-
-
 def pattern2array1D(rate, max_dots, T, p0, pattern, intensity, reverse=False):
     """" Create a list of positions at which the plate should be at the uniform
     time intervals (rate). This is approximation that may print off up to one
