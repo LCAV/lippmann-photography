@@ -11,31 +11,14 @@ import numpy as np
     _array   - returns positions 3D at equal timestamps"""
 
 
-def step_pyramid_pattern(steps_size, height, period, length):
-    """"Calculate blob positions for pyramidal grating
-
-    step_size - distance between neighbouring blobs
-    height - number of blobs per pyramid
-    period - distance between beginnings of pyramids
-    length - leght of the plate
-
-    Returns beginnings of blobs"""""
-
-    base = np.arange(0, length, period)
-    factor = len(base)
-    base = np.repeat(base, height, axis=0)
-    positions = np.array(list(range(height)) * factor) * steps_size
-    return positions + base
-
-
 def pattern2array1D(rate, max_dots, T, p0, pattern, intensity, reverse=False):
     """" Create a list of positions at which the plate should be at the uniform
     time intervals (rate). This is approximation that may print off up to one
     dot per stack of dots (but his should not matter if number of dots printed
     in one place is of order of 50).
 
-    rate        - rate at which the data is red: Range = 5ms - 1/30ms the
-                    shortest time in which the plate can move
+    rate        - rate at which the data is red: Range = 0.2ms - 5ms,
+                it's the shortest time in which the plate can move
     max_dots    - maximal number of dots that can be printed in one place such
                     that the index of refraction stays linear
     T           - time between two laser pulses
@@ -112,6 +95,58 @@ def array2file(time_period, pattern, filename,
         for line in pattern:
             print(delimiter.join(map(str, line)), file=file)
 
+
+def check_array(array, rate, max_speed=10, max_speed_change=100,
+                max_points=3333, min_pos=0, max_pos=100):
+    """""Checks if array is OK to print.
+
+    Checks the number of points, the speed limit, the acceleration limit
+    and if the coordinates are in the right cube
+
+    array       - array of length-3 arrays (in microns)
+    rate        - rate at which to move between points (in milliseconds)
+    max_speed   - max. speed allowed by piezo (in microns over milliseconds)
+    max_acc     - max. acceleration allowed by piezo (in microns over ms^2)
+    max_points  - max. number of points which can be printed in one go
+    min_pos     - min. position possible for the piezo
+    max_pos     - max. position possible for the piezo
+    """""
+
+    np.set_printoptions(precision=2, suppress=True)
+    checks_OK = True
+    if len(array) > max_points:
+        print("[Failed] To many points, expected:",
+              max_points, "got:", len(array))
+        checks_OK = False
+
+    array_ = np.concatenate(([array[0]], array, [array[-1]]))
+    for (p1, p2, p3) in zip(array_[:-2], array_[1:-1], array_[2:]):
+        if not hasattr(p2, "__len__") or len(p2) is not 3:
+            print("[Failed] Wrong array format of the point:", p2)
+            checks_OK = False
+        if any(p2 < np.array(min_pos)):
+            print("[Failed] Position smaller than", min_pos,
+                  "for the point", p2)
+            checks_OK = False
+        if any(p2 > np.array(max_pos)):
+            print("[Failed] Position bigger than", max_pos,
+                  "for the point", p2)
+            checks_OK = False
+        s1 = (p2 - p1) / rate
+        s2 = (p3 - p2) / rate
+        if any(np.abs(s1) > np.array(max_speed)):
+            print("[Failed] Speed", s1,
+                  "bigger that", max_speed,
+                  "for points", p1, "and", p2)
+            checks_OK = False
+
+        if any(np.abs(s2-s1)>max_speed_change):
+            print("[Failed] Change in the speed", s2-s1,
+                  "bigger than", max_speed_change,
+                  "for points", p1, p2, "and", p3)
+            print("(rate", rate, ")")
+    if checks_OK:
+        print("[Success] All checks passed :)")
 
 if __name__ == '__main__':
 
