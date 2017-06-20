@@ -289,7 +289,6 @@ def lippmann_transform(lambdas, spectrum, depths):
     delta_intensity = np.trapz(cosines * spectrum[None, :], two_k, axis=1)
     return intensity, delta_intensity
 
-
 def inverse_lippmann(intensity, lambdas, depths, symmetric=False):
     two_k = 4 * np.pi / lambdas
     
