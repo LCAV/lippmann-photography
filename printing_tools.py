@@ -219,7 +219,7 @@ def pattern2array1D(rate, max_dots, T, p0, pattern, intensity, reverse=False):
 
 
 def pattern2array3D(rate, max_dots, T, pattern, intensity, dot_size,
-                    z_range, y_range):
+                    z_range, y_range, p0=np.array([0, 0, 0]), dx=5, dz=5):
     """" Create a list of positions at which the plate should be at the uniform
     time intervals (rate). This is approximation that may print off up to one
     dot per stack of dots (but his should not matter if number of dots printed
@@ -238,28 +238,43 @@ def pattern2array3D(rate, max_dots, T, pattern, intensity, dot_size,
     Returns the list of three-element lists (positions)"""""
 
     # one might need to add step size in x
-    dy = dot_size[1] * rate / T / max_dots * intensity
-    dz = dot_size[2]  # should this be multiplied by 1.1 or sth. like this?
+    dy = dot_size[1] * rate / T / max_dots / intensity
     pattern_ = pattern
     p = [pattern[0], 0, 0]
-    array = [list(p)]
-    for z in range(math.floor(z_range / dz)):
-        for x in range(len(pattern_)):
-            p[0] = pattern_[x]
-            # if the current ile is forwards or backwards
-            p[1] = 0 if (x + z) % 2 == 0 else y_range
-            # step in x
-            array.append(list(p))
-
+    array = [np.copy(p0+p)]
+    z_steps = math.floor(z_range / dot_size[2])
+    x_steps = len(pattern)
+    for z in range(z_steps):
+        for x in range(x_steps):
+            print("x:", x)
+            # if the current layer is forwards or backwards
+            p[1] = 0
             direction = 1
-            if (x + z) % 2 == 1:
+            if (x_steps % 2 == 1) and ((x + z) % 2 == 1):
+                p[1] = y_range
                 direction = -1
+            if (x_steps % 2 == 0)and ( x % 2 == 1):
+                p[1] = y_range
+                direction = -1
+            sign = np.sign(pattern_[x]-p[0])
+            for x_step in np.arange(p[0], pattern_[x], sign * dx):
+                p[0] = float(x_step)
+                # step in x
+                array.append(list(p0+p))
+            p[0] = pattern_[x]
+            array.append(list(p0+p))
             for y in range(math.floor(y_range / dy[x])):
                 p[1] += direction * dy[x]
                 # step in y
-                array.append(list(p))
-        p[2] += dz
-        pattern_ = pattern_[::-1]
+                array.append(list(p0+p))
+            curr_z = p[2]
+        if z < z_steps - 1:
+            for z_change in np.arange(curr_z, curr_z + dot_size[2], dz):
+                # print(z_change)
+                p[2] = z_change
+                array.append(list(p0+p))
+            p[2] = curr_z + dot_size[2]
+            pattern_ = pattern_[::-1]
     return array
 
 
@@ -296,6 +311,32 @@ def circle_array(radius, n, p0):
         array.append(list(p))
     return array
 
+def cross_array(max_shift, z_range=100, x_range=100, y_range=100, p0 = np.array([50, 50, 0])):
+    array=[np.copy(p0)]
+    p = np.array([0, 0, 0])
+    for z in np.arange(0, z_range, max_shift):
+        for x in np.arange(0, 0.5*x_range, max_shift):
+            array.append(p0+p)
+            p[0] = x
+        for x in np.arange(0.5*x_range, -0.5*x_range, -max_shift):
+            array.append(p0+p)
+            p[0] = x
+        for x in np.arange(-0.5*x_range, 0, max_shift):
+            array.append(p0+p)
+            p[0] = x
+        for y in np.arange(0, 0.5*y_range, max_shift):
+            array.append(p0+p)
+            p[1] = y
+        for y in np.arange(0.5*y_range, -0.5*y_range, -max_shift):
+            array.append(p0+p)
+            p[1] = y
+        for y in np.arange(-0.5*y_range, 0, max_shift):
+            array.append(p0+p)
+            p[1] = y
+        p[2] = z
+    return  array
+
+
 
 def array2file(time_period, pattern, filename,
                newline=";", delimiter=","):
@@ -311,9 +352,9 @@ def array2file(time_period, pattern, filename,
     """""
     with open(filename, 'w') as file:
         print(time_period, newline, file=file)
-        print(delimiter.join((map(str, pattern[0]))), file=file)
+        print(delimiter.join((map(str, pattern[0]))) + newline, file=file)
         for line in pattern:
-            print(delimiter.join(map(str, line)), file=file)
+            print(delimiter.join(map(str, line)) + newline, file=file)
 
 
 def check_array(array, rate, max_speed=10, max_speed_change=100,
@@ -437,33 +478,73 @@ def speed_limit_example():
 
 
 if __name__ == '__main__':
-    # np.set_printoptions(precision=8, suppress=False)
-    # new_pattern = circle_array(radius=50, n=100, p0=[50, 0, 0])
-    # print(len(new_pattern))
-    # array2file(0.2, new_pattern, "circle_small.lipp")
+
+
+    stripes = 201
+    distance = 100.0/(stripes-1)
+    print("distance:", distance)
+    speed = 10
+    #what is ok. speed? (5?)
+    r = 1
+    postions = np.linspace(0, 100, stripes)
+    print(postions)
+    # pttrn = []
+    # for rep in range(stripes):
+    #     for _ in range(2**rep):
+    #         pttrn.append(postions[rep])
+    # pttrn = np.array(pttrn)
+    # print(pttrn)
+
+    # arr = pattern2array3D(
+    #     rate=r,
+    #     max_dots=100,
+    #     T = 0.01,
+    #     pattern = postions,
+    #     intensity = 2**np.array(range(1, stripes +1)),
+    #     dot_size = [1.5, 1.5, 3],
+    #     y_range = 100,
+    #     z_range = 3, #TODO change it to the number of layers
+    #     p0 = np.array([0, 0, 0]),
+    #     dx = 1*r,
+    #     dz = 1)
+    speed_nr = 2
+    intst = np.linspace(0.02, 1, len(postions))
+    arr = pattern2array3D(
+        #slowest was 0.25
+        rate=r,
+        max_dots=4000.0,
+        T = 0.01,
+        pattern = postions,
+        intensity= np.ones_like(postions)*intst[speed_nr],
+        # intensity=np.ones_like(postions),
+        dot_size = [1, 5, 5],
+        y_range = 100,
+        z_range =100, #TODO change it to the number of layers
+        p0 = np.array([0, 0, 0]),
+        dx = speed*r,
+        dz = speed*r)
+
+    arr = np.array(arr)
+
+    print(len(arr))
+    # print(arr)
+    check_array(arr, rate=r, max_speed=speed, max_points=3333*100) # speed have to be smaller that 10
+    # array2file(r, arr, "array" + str(stripes) + "x" + str(1) + "lines-big.csv") # we have to print .csv
+    array2file(r, arr, "3Dcube_"+str(speed_nr)+"_rate-"+str(r)+".lipp")
+    print("file created")
+    #TODO change file extension it in the documentation to lipp
+    # array2file(5, arr, "cross.csv")
 
     # approximation_example()
 
     # speed_limit_example()
 
-    ptrn = np.linspace(0,100,5)
-    arr = pattern2array3D(
-        rate=1,
-        max_dots=10,
-        T = 0.1,
-        pattern = ptrn,
-        intensity = np.ones_like(ptrn),
-        dot_size = [1, 5, 5],
-        z_range = 100,
-        y_range = 100)
-
-    arr = np.array(arr)
-    x0 = arr[:,0]
-    y0 = arr[:,1]
-    z0 = arr[:,2]
     fig = plt.figure()
     ax = fig.gca(projection='3d')
     N = 100
-    # ax.plot(xs=x0, ys=y0, zs=z0, linewidth=2)
-    ax.scatter(x0, y0, z0, marker="o")
+    x0 = arr[:,0]
+    y0 = arr[:,1]
+    z0 = arr[:,2]
+    ax.plot(xs=x0, ys=y0, zs=z0, linewidth=1, alpha=0.5)
+    ax.scatter(x0, y0, z0, marker="o", alpha=0.1)
     plt.show()
