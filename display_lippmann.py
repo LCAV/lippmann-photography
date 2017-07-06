@@ -55,6 +55,8 @@ if len(sys.argv)>1:
     dir = sys.argv[1]
 print(dir)
 
+dir = "/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines"
+
 # Add the direction of the recording
 direction = np.array([0.1,0.,0.9])
 direction = direction/np.linalg.norm(direction)
@@ -62,12 +64,12 @@ direction = direction/np.linalg.norm(direction)
 direction2 = np.array([0.2, 0., 0.8])
 direction2 = direction2/np.linalg.norm(direction2)
 
-lippmann_plate = load_multispectral_image_CAVE(dir + path_CAVE, direction=direction)
+#lippmann_plate = load_multispectral_image_CAVE(dir + path_CAVE, direction=direction)
 #lippmann_plate = load_multispectral_image_SCIEN(dir + path_SCIEN)
 #lippmann_plate = load_multispectral_image_Suwannee(dir + path_Suwannee)
 #lippmann_plate = load_multispectral_image_PURDUE(dir + path_PURDUE)
 #lippmann_plate = load_multispectral_image_Gamaya(dir + path_Gamaya, 'Lippmann_crop.tif')
-#lippmann_plate = load_multispectral_image_HySpex(dir + path_HySpex)
+lippmann_plate = load_multispectral_image_HySpex(dir + path_HySpex)
 
 """Convert to discrete uniformly-sampled spectrums"""
 # lippmann_plate = lippmann_plate.to_uniform_freq(N_samples)
@@ -75,11 +77,11 @@ lippmann_plate = load_multispectral_image_CAVE(dir + path_CAVE, direction=direct
 #Read an RGB image
 #lippmann_plate = create_multispectral_image_discrete(path_RGB, N_samples)
 
-lippmann_plate.spectrum.intensities = lippmann_plate.spectrum.intensities[:200, :200, :]
-lippmann_plate.height = 200
-lippmann_plate.width  = 200
+#lippmann_plate.spectrum.intensities = lippmann_plate.spectrum.intensities[:200, :200, :]
+#lippmann_plate.height = 200
+#lippmann_plate.width  = 200
 
-lippmann_plate.compute_intensity()
+#lippmann_plate.compute_intensity()
 
 #for i in range(30,lippmann_plate.reflectances.shape[2]):
 #    lippmann_plate.reflectances[:,:,i] = lippmann_plate.reflectances[:,:,-1]
@@ -88,15 +90,15 @@ lippmann_plate.compute_intensity()
 
 
 """compute intensity and new spectrum"""
-lippmann_plate.replay(direction=direction2)
+#lippmann_plate.replay(direction=direction2)
 
 
 #shift of the spectrum towards the blues
 
 #lippmann_plate.new_spectrums.blue_shift(1./np.cos(theta_o), extrapolation='cste')
 
-lippmann_plate.spectrum.compute_rgb()
-lippmann_plate.I_r.compute_rgb(sqrt=True)
+#lippmann_plate.spectrum.compute_rgb()
+#lippmann_plate.I_r.compute_rgb(sqrt=True)
 
 
 #gui_manager = GuiManager(lippmann_plate, normalize_spectrums=True, gamma_correct=True)

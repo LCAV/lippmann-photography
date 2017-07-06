@@ -84,16 +84,23 @@ def dielectric_Brag_grating(N, n1, n2, phi1, phi2):
     return r, t
 
 
-def propagation_arbitrary_layers_spectrum(ns, d, lambdas, plot=True):
+def propagation_arbitrary_layers_spectrum(ns, d, lambdas, plot=True, symmetric=False):
     ks = 2 * np.pi / lambdas
     if not hasattr(d, "__iter__"):
-        d = np.ones_like(ns) * d
+        d = np.ones_like(lambdas) * d
+
+    if symmetric:
+        n = np.r_[ns[:0:-1], ns]
+        dist = np.r_[d[:0:-1], d]
+    else:
+        n = ns
+        dist = d
 
     total_reflectance = []
     total_transmittance = []
 
-    for (k, dist) in zip(ks, d):
-        r, t = propagation_arbitrary_layers(ns, k, dist)
+    for (k, distance) in zip(ks, dist):
+        r, t = propagation_arbitrary_layers(n, k, distance)
         total_reflectance.append(np.abs(r) ** 2)
         total_transmittance.append(np.abs(t) ** 2)
 
@@ -134,6 +141,70 @@ def propagation_Born(n, phi):
 
     M = np.array([[cos_phi, -1j / n * sin_phi], [-1j * n * sin_phi, cos_phi]])
     return M
+    
+    
+def propagation_Lippmann_matrix(r, d, n, k0, epsilon=0.2E7):
+    
+    phi = n*k0*d
+
+    r *= d*epsilon
+#    r = np.sqrt(r) 
+    
+    t = np.sqrt(1-r**2)
+#    M = np.array([[1, 1j*r], [-1j*r, 1]])/t
+    
+    S = np.array([[t,1j*r], [1j*r,t]])
+    M = from_S_to_M(S)
+    P = np.array([[np.exp(-1j * phi), 0], [0, np.exp(1j * phi)]])
+    
+    return M @ P
+    
+    
+def propagation_arbitrary_layers_Lippman(rs, ds, k, n):
+
+    M = np.eye(2)
+
+    for r, d in zip(rs, ds):
+        ()
+        Mi = propagation_Lippmann_matrix(r, d, n, k)
+        M = Mi @ M
+        
+
+    S = from_S_to_M(M)
+
+    t = S[0, 0]
+    r = S[0, 1]
+
+    return r, t
+
+
+def propagation_arbitrary_layers_Lippmann_spectrum(rs, d, lambdas, n0=1.45, plot=True, symmetric=False):
+    ks = 2 * np.pi / lambdas
+    if not hasattr(d, "__iter__"):
+        d = np.ones_like(rs) * d
+
+    if symmetric:
+        refl = np.r_[rs[:0:-1], rs]
+        dist = np.r_[d[:0:-1], d]
+    else:
+        refl = rs
+        dist = d
+
+    total_reflectance = []
+    total_transmittance = []
+
+    for k in ks:
+        r, t = propagation_arbitrary_layers_Lippman(refl, dist, k, n0)
+        total_reflectance.append(np.abs(r) ** 2)
+        total_transmittance.append(np.abs(t) ** 2)
+
+    if plot:
+        plt.figure()
+        plt.plot(lambdas, total_reflectance)
+        plt.title('Reflected spectrum with Lippmann matrices')
+        plt.draw()
+
+    return total_reflectance, total_transmittance
 
 
 def propagation_arbitrary_layers_Born(ns, k, d):
@@ -200,23 +271,50 @@ def generate_mono_spectrum(lambdas, color=550E-9):
 
 
 def lippmann_transform(lambdas, spectrum, depths):
+    """"Compute the Lippmann transform
+
+        lambdas     - vector of wavelengths
+        spectrum    - spectrum of light
+        depths      - vector of depths
+
+        Returns intensity       - computed intensity of the interfering waves
+                delta_intensity - the intensity without the baseline term"""""
+        
     two_k = 4 * np.pi / lambdas
 
     one_minus_cosines = 0.5 * (1 - np.cos(two_k[None, :] * depths[:, None]))
     cosines = 0.5 * np.cos(two_k[None, :] * depths[:, None])
 
-    intensity = np.trapz(one_minus_cosines * spectrum[None, :], two_k, axis=1)
+    intensity = -np.trapz(one_minus_cosines * spectrum[None, :], two_k, axis=1)
     delta_intensity = np.trapz(cosines * spectrum[None, :], two_k, axis=1)
     return intensity, delta_intensity
 
-
-def inverse_lippmann(intensity, lambdas, depths):
+def inverse_lippmann(intensity, lambdas, depths, symmetric=False):
     two_k = 4 * np.pi / lambdas
-    exponentials = np.exp(-1j * two_k[:, None] * depths[None, :])
-    return np.abs(1 / depths[-1] * np.trapz(exponentials * intensity[None, :], depths, axis=1)) ** 2
+    
+    if symmetric:
+        I = np.r_[intensity[:0:-1], intensity]
+        d = np.r_[-depths[:0:-1], depths]
+    else:
+        I = intensity
+        d = depths
+    
+    exponentials = np.exp(-1j * two_k[:, None] * d[None, :])
+    return np.abs(1/d[-1] * np.trapz(exponentials * I[None, :], d, axis=1)) ** 2
 
 
 def generate_lippmann_refraction_indices(delta_intensity, n0=1.45, k0=0., mu_n=0.1, mu_k=0., s0=1):
+    """"Generates indices of refraction given a vector of intensity variations
+
+        delta_intensity - vector of intensity variations
+        n0              - basic index of refraction
+        k0              - basic attenuation coefficient (imaginary part of index of refraction)
+        mu_n            - maximum change in index of refraction
+        mu_k            - maximum change in attenuation coefficient
+        s0              - clipping level
+
+        Returns n - list of indices corresponding to depths depths"""""    
+    
     s = delta_intensity / np.max(delta_intensity)
     s[s > s0] = s0
 
@@ -294,7 +392,7 @@ def blobs_to_matrices(begs, ends, n0, delta_n, limit_n=None):
 
 
 if __name__ == '__main__':
-    plt.ion()
+#    plt.ion()
 
     N = 1000
     n1 = 1.45
@@ -316,7 +414,7 @@ if __name__ == '__main__':
     c = c0 / n0
     N_omegas = 300
     delta_z = 10E-9
-    max_depth = 10E-6
+    max_depth = 5E-6
 
     lambda_low = 390E-9;
     lambda_high = 700E-9
@@ -325,9 +423,9 @@ if __name__ == '__main__':
     omegas = np.linspace(omega_high, omega_low, 300)
     lambdas = 2 * np.pi * c0 / omegas
 
-    spectrum = generate_gaussian_spectrum(lambdas=lambdas, mu=400E-9, sigma=30E-9)
-    spectrum = generate_rect_spectrum(lambdas=lambdas, start=350E-9, end=450E-9)
-    #    spectrum = generate_mono_spectrum(lambdas, color=440E-9)
+    spectrum = generate_gaussian_spectrum(lambdas=lambdas, mu=550E-9, sigma=30E-9)
+#    spectrum = generate_rect_spectrum(lambdas=lambdas, start=450E-9, end=540E-9)
+#    spectrum = generate_mono_spectrum(lambdas, color=440E-9)
 
     plt.figure()
     plt.plot(lambdas, spectrum)
@@ -335,6 +433,10 @@ if __name__ == '__main__':
 
     depths = np.arange(0, max_depth, delta_z)
     intensity, delta_intensity = lippmann_transform(lambdas / n0, spectrum, depths)
+    
+#    intensity = np.ones_like(depths)
+#    delta_intensity = np.ones_like(depths)
+    
     ns = generate_lippmann_refraction_indices(delta_intensity, n0=n0, mu_n=0.01)
 
     plt.figure()
@@ -351,7 +453,14 @@ if __name__ == '__main__':
     plt.plot(lambdas, inverted_lippmann)
     plt.title('Inverse Lippmann transform')
 
-    propagation_arbitrary_layers_spectrum(ns, d=delta_z, lambdas=lambdas)
+    inverted_lippmann = inverse_lippmann(intensity, lambdas / n0, depths, symmetric=True)
+    plt.figure()
+    plt.plot(lambdas, inverted_lippmann)
+    plt.title('Inverse Lippmann transform (symmetric)')
+    
+    r, t = propagation_arbitrary_layers_Lippmann_spectrum(rs=intensity/np.max(intensity), d=delta_z, lambdas=lambdas)
+
+    propagation_arbitrary_layers_spectrum(ns, d=delta_z, lambdas=lambdas, symmetric=True)
     propagation_arbitrary_layers_Born_spectrum(ns, d=delta_z, lambdas=lambdas)
-    plt.ioff()
+#    plt.ioff()
     plt.show()
