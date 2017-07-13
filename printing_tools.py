@@ -19,8 +19,8 @@ from mpl_toolkits.mplot3d import Axes3D
 
 
 class Trajectory:
-    """"Abstract class which represent trajectory to be approximated using
-    piecewise straight line, with knots at grid points"""""
+    """Abstract class which represent trajectory to be approximated using
+    piecewise straight line, with knots at grid points"""
 
     def plot(self, res=100):
         """"Returns tree arrays - of x, y, and z which can be plotted with
@@ -185,45 +185,131 @@ class NicelyParameterized(Trajectory):
         err = np.mean(err)
         return err, positions
 
+def move_slow(p0, p_curr, s_max, ds, coord, margin):
 
-def pattern2array1D(rate, max_dots, T, p0, pattern, intensity, reverse=False):
-    """" Create a list of positions at which the plate should be at the uniform
-    time intervals (rate). This is approximation that may print off up to one
-    dot per stack of dots (but his should not matter if number of dots printed
-    in one place is of order of 50).
+    full = True
+    if abs(s_max-p_curr[coord]) < 2*margin:
+        full = False
+        margin = (s_max-p_curr[coord])/2
 
-    rate        - rate at which the data is red: Range = 0.2ms - 5ms,
-                it's the shortest time in which the plate can move
-    max_dots    - maximal number of dots that can be printed in one place such
-                    that the index of refraction stays linear
-    T           - time between two laser pulses
-    p0          - start position (position before first dot)
-    pattern     - relative positions of dots (x=0 will be moved to p)
-    intensity   - ratio of the intensity of the dot to the max. intensity
+    arr = []
+    direction = 1
+    if p_curr[coord] - s_max > 0:
+        direction = -1
+    s_0 = p_curr[coord]
+    a = ds**2/(4*margin)
+    t_max = 2*margin/ds
+    p = list(p_curr)
+    for t in np.arange(0, t_max, 1.0):
+        s = a*t**2
+        p[coord] = direction*s + s_0
+        arr.append(list(p))
 
-    Returns the list of three-element lists (positions)"""""
+    # acelerate to marigin,
+    if full:
+        new_beg = list(p_curr)
+        new_beg[coord] += direction*margin
+        p, tmp_arr = move(p0, new_beg, s_max - direction*margin, ds, coord)
+        arr += tmp_arr
+    # descacelerate
 
-    print("number of entries read between pulses:", rate / T)
-    max_time = T * max_dots
-    max_repeat = max_time / rate
+    for t in np.arange(t_max, 0, -1.0):
+        s = a*t**2
+        p[coord] = -direction*s + s_max
+        arr.append(list(p))
+
+    return p, arr
+
+def move(p0, p_curr, s_max, ds, coord):
+    """Helper function for pattern2array3d, adds points between current point
+     p_curr and p_curr shifted by s_max in direction coord
+     (points are not further than ds, if the distance is to small does not add
+     any points."""
+
     array = []
-    if reverse:
-        pattern = pattern[::-1]
-        intensity = intensity[::-1]
-    for x, i in zip(pattern, intensity):
-        p = list(p0)
-        p[0] += x
-        for _ in range(math.floor(i * max_repeat)):
-            array.append(p)
+    p = p_curr
+    if s_max < p_curr[coord]:
+        ds = -ds
+    for s in np.arange(p_curr[coord], s_max, ds):
+        p[coord] = s
+        array.append(list(p0 + p))
+
+    return p, array
+
+
+def pattern2array3D(rate, pattern, speed, z_steps, delta_z,
+                    speed_limit=10, p0=np.array([0, 0, 0]),
+                    y_range=100, z_range=100, point_limit = 3333,
+                    cut=False, margin=5):
+    """ Create a list of positions at which the plate should be at the uniform
+    time intervals (rate).
+
+    rate        - rate at which the data is red: Range = 0.2 - 5, in milis
+                it's the shortest time in which the plate can move
+    pattern     - relative positions of dots (x=0 will be moved to p0)
+    speed       - array of speeds with which to move along y direction
+                (of the same length as pattern)
+    z_steps     - number of layers in z direction
+    delta_z     - distance between layers in z direction
+    speed_limit - maximal speed of the piezo, should be 10, in microns/milis
+    p0          - start position (position before first dot)
+    y_range     - maximal value of y (not more than 100, in microns)
+    z_range     - maximal value of z (not more than 100, in microns)
+    cut         - if the array should have marks where to cut it
+    margin      - at what distance to the end the piezo should slow down
+
+    Returns the list of three-element lists (positions)"""
+
+    if np.max(speed) > speed_limit:
+        print("Maximal speed is bigger than speed limit: ", speed_limit)
+        return
+
+    dy = speed * rate
+    p = [pattern[0], 0, 0]
+    array = [np.copy(p0 + p)]
+    ds = speed_limit * rate
+    z_steps = min(z_steps, int(np.floor(z_range / delta_z)))
+    odd_pattern = len(pattern) % 2 == 1
+    counter = 0
+
+    for z in range(z_steps):
+        for x in range(len(pattern)):
+            if odd_pattern:
+                inverted = (x + z) % 2 == 1
+            else:
+                inverted = x % 2 == 1
+            p, tmp_arr = move(p0, p, pattern[x], ds, coord=0)
+            if cut and counter + len(tmp_arr) > point_limit:
+                array.append([-1, -1, -1])
+                counter = len(tmp_arr)
+            else:
+                counter += len(tmp_arr)
+            array += list(tmp_arr)
+            p[0] = pattern[x]
+            p, tmp_arr = move_slow(p0, p, 0 if inverted else y_range, dy[x], coord=1, margin=margin)
+            if cut and counter + len(tmp_arr) > point_limit:
+                array.append([-1,-1,-1])
+                counter = len(tmp_arr)
+            else:
+                counter += len(tmp_arr)
+            array += list(tmp_arr)
+        if z < z_steps - 1:
+            p, tmp_arr = move(p0, p, (z+1)*delta_z, ds, coord=2)
+            if cut and counter + len(tmp_arr) > point_limit:
+                array.append([-1,-1,-1])
+                counter = len(tmp_arr)
+            else:
+                counter += len(tmp_arr)
+            array += list(tmp_arr)
+            p[2] = (z+1)*delta_z
+            pattern = pattern[::-1]
     return array
 
 
-def pattern2array3D(rate, max_dots, T, pattern, intensity, dot_size,
+def pattern2array3D_old(rate, max_dots, T, pattern, intensity, dot_size,
                     z_range, y_range, p0=np.array([0, 0, 0]), dx=5, dz=5):
-    """" Create a list of positions at which the plate should be at the uniform
-    time intervals (rate). This is approximation that may print off up to one
-    dot per stack of dots (but his should not matter if number of dots printed
-    in one place is of order of 50).
+    """ This is old and shoudl be removed, but I (Michalina) need it
+    as a reference.
 
     rate        - rate at which the data is red: Range = 0.2ms - 5ms,
                 it's the shortest time in which the plate can move
@@ -235,7 +321,7 @@ def pattern2array3D(rate, max_dots, T, pattern, intensity, dot_size,
     intensity   - ratio of the intensity of the dot to the max. intensity
     dot_size    - vector of dot sizes (in x, y and z)
 
-    Returns the list of three-element lists (positions)"""""
+    Returns the list of three-element lists (positions)"""
 
     # one might need to add step size in x
     dy = dot_size[1] * rate / T / max_dots / intensity
@@ -278,6 +364,11 @@ def pattern2array3D(rate, max_dots, T, pattern, intensity, dot_size,
     return array
 
 
+def intensity2speed(T, dot_size, intensity, max_dots):
+    intensity /= np.max(intensity)
+    return dot_size / (intensity * T * max_dots)
+
+
 def square_wave_array(p0, dx, nx, stepsx, dy, ny):
     """"Simple square wave in x and y directions
     which whe didn't managed to print """""
@@ -311,31 +402,32 @@ def circle_array(radius, n, p0):
         array.append(list(p))
     return array
 
-def cross_array(max_shift, z_range=100, x_range=100, y_range=100, p0 = np.array([50, 50, 0])):
-    array=[np.copy(p0)]
+
+def cross_array(max_shift, z_range=100, x_range=100, y_range=100,
+                p0=np.array([50, 50, 0])):
+    array = [np.copy(p0)]
     p = np.array([0, 0, 0])
     for z in np.arange(0, z_range, max_shift):
-        for x in np.arange(0, 0.5*x_range, max_shift):
-            array.append(p0+p)
+        for x in np.arange(0, 0.5 * x_range, max_shift):
+            array.append(p0 + p)
             p[0] = x
-        for x in np.arange(0.5*x_range, -0.5*x_range, -max_shift):
-            array.append(p0+p)
+        for x in np.arange(0.5 * x_range, -0.5 * x_range, -max_shift):
+            array.append(p0 + p)
             p[0] = x
-        for x in np.arange(-0.5*x_range, 0, max_shift):
-            array.append(p0+p)
+        for x in np.arange(-0.5 * x_range, 0, max_shift):
+            array.append(p0 + p)
             p[0] = x
-        for y in np.arange(0, 0.5*y_range, max_shift):
-            array.append(p0+p)
+        for y in np.arange(0, 0.5 * y_range, max_shift):
+            array.append(p0 + p)
             p[1] = y
-        for y in np.arange(0.5*y_range, -0.5*y_range, -max_shift):
-            array.append(p0+p)
+        for y in np.arange(0.5 * y_range, -0.5 * y_range, -max_shift):
+            array.append(p0 + p)
             p[1] = y
-        for y in np.arange(-0.5*y_range, 0, max_shift):
-            array.append(p0+p)
+        for y in np.arange(-0.5 * y_range, 0, max_shift):
+            array.append(p0 + p)
             p[1] = y
         p[2] = z
-    return  array
-
+    return array
 
 
 def array2file(time_period, pattern, filename,
@@ -357,7 +449,7 @@ def array2file(time_period, pattern, filename,
             print(delimiter.join(map(str, line)) + newline, file=file)
 
 
-def check_array(array, rate, max_speed=10, max_speed_change=100,
+def check_array(array, rate, max_speed=10, max_speed_change=10,
                 max_points=3333, min_pos=0, max_pos=100):
     """""Checks if array is OK to print.
 
@@ -479,15 +571,26 @@ def speed_limit_example():
 
 if __name__ == '__main__':
 
+    # p, arr = move_slow(np.array([0,0,0]), [0,0,0], 40, 1, 0, 40)
+    # arr = np.array(arr)
+    # plt.plot(arr[:,0])
+    # plt.show()
 
-    stripes = 201
-    distance = 100.0/(stripes-1)
+    plot_stuff = True
+    stripes = 100
+    distance = 100.0 / (stripes - 1)
     print("distance:", distance)
-    speed = 10
-    #what is ok. speed? (5?)
+    speed = 1
+    # what is ok. speed? (5?)
     r = 1
+    delta_z = 5
+    z_steps = 1
+    # postions1 = np.linspace(0, 50, int(stripes/2))
+    # postions2 = np.linspace(50, 100, int(stripes/2))
+    # postions = list(zip(postions1, postions2))
+    # postions = [item for sublist in postions for item in sublist]
     postions = np.linspace(0, 100, stripes)
-    print(postions)
+    # print(postions)
     # pttrn = []
     # for rep in range(stripes):
     #     for _ in range(2**rep):
@@ -495,56 +598,39 @@ if __name__ == '__main__':
     # pttrn = np.array(pttrn)
     # print(pttrn)
 
-    # arr = pattern2array3D(
-    #     rate=r,
-    #     max_dots=100,
-    #     T = 0.01,
-    #     pattern = postions,
-    #     intensity = 2**np.array(range(1, stripes +1)),
-    #     dot_size = [1.5, 1.5, 3],
-    #     y_range = 100,
-    #     z_range = 3, #TODO change it to the number of layers
-    #     p0 = np.array([0, 0, 0]),
-    #     dx = 1*r,
-    #     dz = 1)
-    speed_nr = 2
-    intst = np.linspace(0.02, 1, len(postions))
     arr = pattern2array3D(
-        #slowest was 0.25
         rate=r,
-        max_dots=4000.0,
-        T = 0.01,
-        pattern = postions,
-        intensity= np.ones_like(postions)*intst[speed_nr],
-        # intensity=np.ones_like(postions),
-        dot_size = [1, 5, 5],
-        y_range = 100,
-        z_range =100, #TODO change it to the number of layers
-        p0 = np.array([0, 0, 0]),
-        dx = speed*r,
-        dz = speed*r)
+        pattern=postions,
+        speed=np.ones_like(postions)*speed,
+        z_steps=z_steps,
+        delta_z=delta_z,
+        cut = True)
 
+    plot_arr = pattern2array3D(
+        rate=r,
+        pattern=postions,
+        speed=np.ones_like(postions)*speed,
+        z_steps=z_steps,
+        delta_z=delta_z)
+
+    plot_arr = np.array(plot_arr)
     arr = np.array(arr)
 
-    print(len(arr))
+    print("full", len(arr))
+    print("without markers", len(plot_arr))
     # print(arr)
-    check_array(arr, rate=r, max_speed=speed, max_points=3333*100) # speed have to be smaller that 10
-    # array2file(r, arr, "array" + str(stripes) + "x" + str(1) + "lines-big.csv") # we have to print .csv
-    array2file(r, arr, "3Dcube_"+str(speed_nr)+"_rate-"+str(r)+".lipp")
+    # check_array(plot_arr, rate=r, max_speed=speed,
+    #             max_points=3333 * 100)
+    array2file(r, arr, "new_better_pattern_speed_"+str(speed)+"_layers_"+str(z_steps)+".lipp")
     print("file created")
-    #TODO change file extension it in the documentation to lipp
-    # array2file(5, arr, "cross.csv")
 
-    # approximation_example()
-
-    # speed_limit_example()
-
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
-    N = 100
-    x0 = arr[:,0]
-    y0 = arr[:,1]
-    z0 = arr[:,2]
-    ax.plot(xs=x0, ys=y0, zs=z0, linewidth=1, alpha=0.5)
-    ax.scatter(x0, y0, z0, marker="o", alpha=0.1)
-    plt.show()
+    if plot_stuff:
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        N = 100
+        x0 = plot_arr[:, 0]
+        y0 = plot_arr[:, 1]
+        z0 = plot_arr[:, 2]
+        ax.plot(xs=x0, ys=y0, zs=z0, linewidth=1, alpha=0.5)
+        ax.scatter(x0, y0, z0, marker="o", alpha=0.1)
+        plt.show()
