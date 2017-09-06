@@ -3,14 +3,8 @@ Created on 31.05.17
 
 @author: miska
 """
-from __future__ import print_function
-from __future__ import division
 import math
 import numpy as np
-import matplotlib.pyplot as plt
-# noinspection PyUnresolvedReferences
-# this is used for plots 3D
-from mpl_toolkits.mplot3d import Axes3D
 
 """ Naming conventions in this file (should we use classes or namespaces?)
     _pattern - returns positions of the dots
@@ -136,7 +130,7 @@ class NicelyParameterized(Trajectory):
     """"Trajectory given by the set points at uniform timestamps"""""
 
     def __init__(self, xs, ys, zs):
-        self.pos = np.zeros((3, len(xs)))
+        self.pos = np.zeros((len(xs), 3))
         self.pos[:, 0] = xs
         self.pos[:, 1] = ys
         self.pos[:, 2] = zs
@@ -187,6 +181,7 @@ class NicelyParameterized(Trajectory):
         err = np.mean(err)
         return err, positions
 
+
 def move_slow(p0, p_curr, s_max, ds, coord, margin):
 
     full = True
@@ -208,7 +203,7 @@ def move_slow(p0, p_curr, s_max, ds, coord, margin):
     for t in np.arange(0, t_max, 1.0):
         s = a*t**2
         p[coord] = direction*s + s_0
-        arr.append(list(p))
+        arr.append(list(p0+p))
 
     # acelerate to marigin,
     if full:
@@ -221,9 +216,10 @@ def move_slow(p0, p_curr, s_max, ds, coord, margin):
     for t in np.arange(t_max, 0, -1.0):
         s = a*t**2
         p[coord] = -direction*s + s_max
-        arr.append(list(p))
+        arr.append(list(p0 + p))
 
     return p, arr
+
 
 def move(p0, p_curr, s_max, ds, coord):
     """Helper function for pattern2array3d, adds points between current point
@@ -266,7 +262,7 @@ def pattern2array3D(rate, pattern, speed, z_steps, delta_z,
     Returns the list of three-element lists (positions)"""
 
     if np.max(speed) > speed_limit:
-        print("Maximal speed is bigger than speed limit: ", speed_limit)
+        print("Maximal speed is bigger than speed limit: ", speed_limit, "\n")
         return
 
     dy = speed * rate
@@ -286,8 +282,7 @@ def pattern2array3D(rate, pattern, speed, z_steps, delta_z,
                 inverted = (x + z) % 2 == 1
             else:
                 inverted = x % 2 == 1
-
-            p, tmp_arr = move_slow(p0, p, pattern[x], ds=np.min([ds, 0.3*dx]), coord=0, margin=margin)
+            p, tmp_arr = move(p0, p, pattern[x], ds=np.min([ds, 0.3*dx]), coord=0)
             if cut and counter + len(tmp_arr) > point_limit:
                 array.append([-1, -1, -1])
                 counter = len(tmp_arr)
@@ -305,16 +300,29 @@ def pattern2array3D(rate, pattern, speed, z_steps, delta_z,
         if z < z_steps - 1:
             # That's a hack! (0.5 ds)
             dz = np.min([ds, 0.3*delta_z])
-            p, tmp_arr = move_slow(p0, p, (z+1)*delta_z, dz, coord=2, margin=1)
+            p, tmp_arr = move(p0, p, -(z+1)*delta_z, dz, coord=2)
             if cut and counter + len(tmp_arr) > point_limit:
                 array.append([-1,-1,-1])
                 counter = len(tmp_arr)
             else:
                 counter += len(tmp_arr)
             array += list(tmp_arr)
-            p[2] = (z+1)*delta_z
+            p[2] = -(z+1)*delta_z
             pattern = pattern[::-1]
     return array
+
+
+def pattern2array3DPair(rate, pattern, speed, z_steps, delta_z,
+                    speed_limit=10, p0=np.array([0, 0, 0]),
+                    y_range=100, z_range=100, point_limit = 3333, margin=5):
+    return (pattern2array3D(rate, pattern, speed, z_steps, delta_z,
+                    speed_limit, p0,
+                    y_range, z_range, point_limit, cut=False, margin=margin),
+            pattern2array3D(rate, pattern, speed, z_steps, delta_z,
+                    speed_limit, p0,
+                    y_range, z_range, point_limit,
+                    cut=True, margin=margin))
+
 
 def heightTest(rate, line_len, z_steps,
                     speed_limit=10.0, p0=np.array([0.0, 0.0, 0.0]),
@@ -355,63 +363,6 @@ def heightTest(rate, line_len, z_steps,
             p, tmp_arr = move(p0, p, (z+1)*delta_z, ds, 2)
             array += list(tmp_arr)
             p[2] = (z+1)*delta_z
-    return array
-
-def pattern2array3D_old(rate, max_dots, T, pattern, intensity, dot_size,
-                    z_range, y_range, p0=np.array([0, 0, 0]), dx=5, dz=5):
-    """ This is old and shoudl be removed, but I (Michalina) need it
-    as a reference.
-
-    rate        - rate at which the data is red: Range = 0.2ms - 5ms,
-                it's the shortest time in which the plate can move
-    max_dots    - maximal number of dots that can be printed in one place such
-                    that the index of refraction stays linear
-    T           - time between two laser pulses
-    p0          - start position (position before first dot)
-    pattern     - relative positions of dots (x=0 will be moved to p)
-    intensity   - ratio of the intensity of the dot to the max. intensity
-    dot_size    - vector of dot sizes (in x, y and z)
-
-    Returns the list of three-element lists (positions)"""
-
-    # one might need to add step size in x
-    dy = dot_size[1] * rate / T / max_dots / intensity
-    pattern_ = pattern
-    p = [pattern[0], 0, 0]
-    array = [np.copy(p0+p)]
-    z_steps = math.floor(z_range / dot_size[2])
-    x_steps = len(pattern)
-    for z in range(z_steps):
-        for x in range(x_steps):
-            print("x:", x)
-            # if the current layer is forwards or backwards
-            p[1] = 0
-            direction = 1
-            if (x_steps % 2 == 1) and ((x + z) % 2 == 1):
-                p[1] = y_range
-                direction = -1
-            if (x_steps % 2 == 0)and ( x % 2 == 1):
-                p[1] = y_range
-                direction = -1
-            sign = np.sign(pattern_[x]-p[0])
-            for x_step in np.arange(p[0], pattern_[x], sign * dx):
-                p[0] = float(x_step)
-                # step in x
-                array.append(list(p0+p))
-            p[0] = pattern_[x]
-            array.append(list(p0+p))
-            for y in range(math.floor(y_range / dy[x])):
-                p[1] += direction * dy[x]
-                # step in y
-                array.append(list(p0+p))
-            curr_z = p[2]
-        if z < z_steps - 1:
-            for z_change in np.arange(curr_z, curr_z + dot_size[2], dz):
-                # print(z_change)
-                p[2] = z_change
-                array.append(list(p0+p))
-            p[2] = curr_z + dot_size[2]
-            pattern_ = pattern_[::-1]
     return array
 
 
@@ -522,6 +473,8 @@ def check_array(array, rate, max_speed=10, max_speed_change=10,
               max_points, "got:", len(array))
         checks_OK = False
 
+    depth = 101
+
     array_ = np.concatenate(([array[0]], array, [array[-1]]))
     for (p1, p2, p3) in zip(array_[:-2], array_[1:-1], array_[2:]):
         if not hasattr(p2, "__len__") or len(p2) is not 3:
@@ -548,256 +501,12 @@ def check_array(array, rate, max_speed=10, max_speed_change=10,
                   "bigger than", max_speed_change,
                   "for points", p1, p2, "and", p3)
             print("(rate", rate, ")")
+            checks_OK = False
+
+        if p2[2] > depth + 0.01:
+            print("[Failed] path is going down around point: ", p2)
+            checks_OK = False
+        depth = p2[2]
+
     if checks_OK:
         print("[Success] All checks passed :)")
-
-
-# noinspection PyTypeChecker
-def approximation_example():
-    theta = np.linspace(-4 * np.pi, 4 * np.pi, 200)
-    z = np.linspace(0, 1, 200)
-    r = z ** 2 + 1
-    x = r * np.sin(theta)
-    y = r * np.cos(theta)
-
-    some_line = NicelyParameterized(x, y, z)
-    # some_line = StraightLine([0,0,0],[1,2,3])
-    error, path = some_line.approximate(0.1, 10, space_range=3)
-    print(error)
-    print("----")
-    x1 = path[0, :]
-    y1 = path[1, :]
-    z1 = path[2, :]
-
-    ox, oy, oz = some_line.plot()
-
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
-    ax.plot(xs=ox, ys=oy, zs=oz)
-    ax.plot(xs=x1, ys=y1, zs=z1)
-    plt.show()
-
-
-# noinspection PyTypeChecker
-def speed_limit_example():
-    theta = np.linspace(0, 4 * np.pi, 400)
-    z = np.linspace(0, 1, 400)
-    r = z ** 2 + 1
-    x = r * np.sin(theta + 0.3 * theta ** 2)
-    y = r * np.cos(theta + 0.3 * theta ** 2)
-
-    some_line = NicelyParameterized(x, y, z)
-    # some_line = StraightLine([0,0,0],[1,2,3])
-    error, positions = some_line.limit_speed(speed=0.2, rate=1)
-    print(error)
-    print("----")
-    x1 = positions[0, :]
-    y1 = positions[1, :]
-    z1 = positions[2, :]
-
-    some_line = NicelyParameterized(x1, y1, z1)
-    error, path = some_line.approximate(0.01, 200)
-    print(error)
-    print("----")
-    x2 = path[0, :]
-    y2 = path[1, :]
-    z2 = path[2, :]
-
-    some_line = NicelyParameterized(x2, y2, z2)
-    error, positions = some_line.limit_speed(speed=0.2, rate=2)
-    print(error)
-    print("----")
-    x3 = positions[0, :]
-    y3 = positions[1, :]
-    z3 = positions[2, :]
-
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
-    ax.plot(xs=x, ys=y, zs=z)
-    ax.plot(xs=x1, ys=y1, zs=z1)
-    ax.plot(xs=x2, ys=y2, zs=z2)
-    ax.plot(xs=x3, ys=y3, zs=z3)
-    plt.show()
-
-
-def color_z_pattern():
-
-    plot_stuff = True
-    stripes = 5
-    distance = 100.0 / (stripes - 1)
-    print("stripes:", stripes)
-    speed = 5
-    # what is ok. speed? (5?)h
-    r = 1
-    wlen = 0.531
-    harm = 0
-    delta_z = (2*harm + 1)*wlen/(2*1.45)
-    z_steps = int(math.floor(1/delta_z))
-    print("z steps:", z_steps)
-
-    postions = np.linspace(0, 100, stripes)
-    print(postions)
-
-    arr = pattern2array3D(
-        p0=np.array([0, 0, 100]),
-        rate=r,
-        pattern=postions,
-        speed=np.ones_like(postions)*speed,
-        z_steps=z_steps,
-        delta_z=delta_z,
-        cut = True)
-
-    plot_arr = pattern2array3D(
-        rate=r,
-        pattern=postions,
-        speed=np.ones_like(postions)*speed,
-        z_steps=z_steps,
-        delta_z=delta_z,
-        margin=20)
-    # ll = 50
-    # steps = 5
-    # arr = heightTest(
-    #     p0 = np.array([0,0,0]),
-    #     rate = r,
-    #     line_len = ll,
-    #     z_steps = steps)
-
-    # plot_arr = arr
-
-    if plot_stuff:
-        plot_arr = np.array(plot_arr)
-    arr = np.array(arr)
-
-    print("full", len(arr))
-    if plot_stuff:
-       print("without markers", len(plot_arr))
-    # print(arr)
-    check_array(plot_arr, rate=r, max_speed=speed+0.01,
-                 max_points=3333 * 1000, max_speed_change=speed)
-    array2file(r, arr, "color_z_"+str(wlen)+"_wlen_"+str(speed)+"_speed.lipp")
-    print("file created")
-
-    if plot_stuff:
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        N = 100
-        x0 = plot_arr[:, 0]
-        y0 = plot_arr[:, 1]
-        z0 = plot_arr[:, 2]
-        ax.plot(xs=x0, ys=y0, zs=z0, linewidth=1, alpha=0.5)
-        ax.scatter(x0, y0, z0, marker="o", alpha=0.1)
-        plt.show()
-
-def color_x_pattern():
-
-    plot_stuff = True
-    speed = 5
-    # what is ok. speed? (5?)
-    r = 1
-    wlen = 0.531
-    harm = 0
-    dx = (2*harm + 1)*wlen/(2*1.45)
-    delta_z = 2
-    z_steps = int(math.floor(6/delta_z))
-    print("layers in z:", z_steps)
-    positions = np.arange(0, 3, dx)
-    print("layers in x:", len(positions))
-
-
-    arr = pattern2array3D(
-        p0=np.array([0, 0, 100]),
-        rate=r,
-        pattern=positions,
-        speed=np.ones_like(positions)*speed,
-        z_steps=z_steps,
-        delta_z=delta_z,
-        cut = True)
-
-    plot_arr = pattern2array3D(
-        rate=r,
-        pattern=positions,
-        speed=np.ones_like(positions)*speed,
-        z_steps=z_steps,
-        delta_z=delta_z,
-        margin=10)
-    
-    # ll = 50
-    # steps = 5
-    # arr = heightTest(
-    #     p0 = np.array([0,0,0]),
-    #     rate = r,
-    #     line_len = ll,
-    #     z_steps = steps)
-
-    # plot_arr = arr
-
-    if plot_stuff:
-        plot_arr = np.array(plot_arr)
-    arr = np.array(arr)
-
-    print("full", len(arr))
-    if plot_stuff:
-       print("without markers", len(plot_arr))
-    # print(arr)
-    check_array(plot_arr, rate=r, max_speed=speed+0.01,
-                 max_points=3333 * 1000, max_speed_change=speed)
-    array2file(r, arr, "color_x_"+str(wlen)+"_wlen_"+str(speed)+"_speed.lipp")
-    print("file created")
-
-    if plot_stuff:
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        N = 100
-        x0 = plot_arr[:, 0]
-        y0 = plot_arr[:, 1]
-        z0 = plot_arr[:, 2]
-        ax.plot(xs=x0, ys=y0, zs=z0, linewidth=1, alpha=0.5)
-        ax.scatter(x0, y0, z0, marker="o", alpha=0.1)
-        plt.show()
-
-
-def heightTestPattern():
-    plot_stuff = False
-    speed = 5
-    # what is ok. speed? (5?)
-    r = 1
-
-    ll = 50
-    steps = 20
-    arr = heightTest(
-        p0 = np.array([0,0,0]),
-        rate = r,
-        line_len = ll,
-        z_steps = steps,
-        speed_limit = speed)
-
-    plot_arr = arr
-
-    if plot_stuff:
-        plot_arr = np.array(plot_arr)
-    arr = np.array(arr)
-
-    print("full", len(arr))
-    if plot_stuff:
-       print("without markers", len(plot_arr))
-    # print(arr)
-    check_array(plot_arr, rate=r, max_speed=speed+0.01,
-                 max_points=3333 * 100, max_speed_change=speed)
-    array2file(r, arr, "heightTest_length"+str(ll)+"_steps_"+str(steps)+"_speed.lipp")
-    print("file created")
-
-    if plot_stuff:
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        N = 100
-        x0 = plot_arr[:, 0]
-        y0 = plot_arr[:, 1]
-        z0 = plot_arr[:, 2]
-        ax.plot(xs=x0, ys=y0, zs=z0, linewidth=1, alpha=0.5)
-        ax.scatter(x0, y0, z0, marker="o", alpha=0.1)
-        plt.show()
-
-
-if __name__ == '__main__':
-    color_z_pattern()
-
