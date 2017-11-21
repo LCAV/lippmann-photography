@@ -1,4 +1,4 @@
-#!/Users/miska/anaconda/bin/python
+#!/usr/bin/python3
 
 import argparse
 import matplotlib.pyplot as plt
