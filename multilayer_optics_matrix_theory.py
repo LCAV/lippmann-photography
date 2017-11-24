@@ -328,7 +328,7 @@ def blobs_to_ref_index(blob_z0, blob_delta_z, n0, delta_n, depths, limit_n=None)
         blob_z0         - array of beginnings of the blobs
         blob_delta_x    - size of the blob
         n0              - basic index of refraction
-        delta_n         - change of index of refraction per blob (scalar)
+        delta_n         - change of index of refraction per blob (scalar or array)
         depths          - uniform array of distances
         limit_n - if given, the maximal change of index of refraction possible,
         then the change of index is normalized, so it does not exceed `limit_n`
@@ -337,10 +337,13 @@ def blobs_to_ref_index(blob_z0, blob_delta_z, n0, delta_n, depths, limit_n=None)
 
     n = np.zeros_like(depths)
     delta_z = depths[1] - depths[0]
-    for z0 in blob_z0:
+    if not hasattr(delta_n, "__iter__"):
+        delta_n = np.ones_like(blob_z0) * delta_n
+
+    for (z0,idx) in zip(blob_z0, range(len(blob_z0))):
         idx_min = math.floor(z0 / delta_z)
         idx_max = math.floor((z0 + blob_delta_z) / delta_z)
-        n[idx_min:idx_max] = n[idx_min:idx_max] + delta_n
+        n[idx_min:idx_max] = n[idx_min:idx_max] + delta_n[idx]
     if limit_n is not None:
         n = n/np.max(n)*limit_n
     n = n+n0
