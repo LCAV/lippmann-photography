@@ -419,7 +419,7 @@ if __name__ == '__main__':
     delta_z = 10E-9
     max_depth = 5E-6
 
-    lambda_low = 390E-9;
+    lambda_low = 390E-9
     lambda_high = 700E-9
     omega_low = 2 * np.pi * c0 / lambda_high;
     omega_high = 2 * np.pi * c0 / lambda_low
