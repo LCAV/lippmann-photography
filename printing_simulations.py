@@ -110,8 +110,9 @@ if __name__ == '__main__':
     range_to_plot = 1000
     plt.figure()
     plt.plot(depths[:range_to_plot], draw_index[:range_to_plot])
-    plt.xlabel("refractive index", fontsize=20)
-    plt.ylabel("depth", fontsize=20)
+    plt.xlabel("depth", fontsize=20)
+    plt.ylabel("refractive index", fontsize=20)
+    plt.ylim([n0, n0 + delta_n*1.1])
 
     # plot the reflection
     plt.figure()
