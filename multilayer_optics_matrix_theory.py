@@ -421,7 +421,7 @@ if __name__ == '__main__':
 
     lambda_low = 390E-9
     lambda_high = 700E-9
-    omega_low = 2 * np.pi * c0 / lambda_high;
+    omega_low = 2 * np.pi * c0 / lambda_high
     omega_high = 2 * np.pi * c0 / lambda_low
     omegas = np.linspace(omega_high, omega_low, 300)
     lambdas = 2 * np.pi * c0 / omegas
