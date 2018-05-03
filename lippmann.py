@@ -266,7 +266,7 @@ class LippmannDiscrete(Lippmann):
         self.N_prime = N_prime
         self.N = np.int( np.floor(N_prime*v_max/(v_max-v_min)) ) 
         
-        self.f_max = 2./(lambda_min)
+        self.f_max = 4./(lambda_min)
         self.df    = self.f_max/(self.N-1)
         self.dr    = 1./(2.*self.f_max)         
         

@@ -181,7 +181,7 @@ def create_multispectral_image_discrete(path, N_prime):
     
     #comppute the spectrum
     im_xyz   = ct.from_rgb_to_xyz(im)   
-    lippmann_plate.spectrum.intensities = ct.from_xyz_to_spectrum(im_xyz, lippmann_plate.lambdas)
+    lippmann_plate.spectrum.intensities = ct.from_xyz_to_spectrum(im_xyz, lippmann_plate.wavelengths)
     
     return lippmann_plate
     

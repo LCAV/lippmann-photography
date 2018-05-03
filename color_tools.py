@@ -157,10 +157,7 @@ def from_xyz_to_spectrum(xyz_colors, wavelengths, nnls=False):
     
     M = np.stack([cmf_cie_interp_x, cmf_cie_interp_y, cmf_cie_interp_z])
     
-#    spectral_colors = np.zeros([xyz_colors.shape[0], len(wavelengths)])
-    
     spectral_colors = np.linalg.lstsq(M, xyz_colors.T)[0].T
-    
     
     lambd=1E-3
     #L2 regularization
@@ -170,16 +167,12 @@ def from_xyz_to_spectrum(xyz_colors, wavelengths, nnls=False):
     
     A = np.concatenate((M, lambd*D) )
     
-    for idx in range(xyz_colors.shape[0]):
-        print(idx)
-        
-        if nnls:
+    if nnls:
+        for idx in range(xyz_colors.shape[0]):
             
             b = np.concatenate((xyz_colors[idx,:], np.zeros(len(wavelengths)) ))
             spectral_colors[idx, :] = nnls(A, b)[0]
-            
-        else: #standard least squares
-            spectral_colors[idx, :] = np.linalg.lstsq(M, xyz_colors[idx,:])[0]
+        
         
     return spectral_colors.reshape(orig_shape[:-1] + (len(wavelengths), ))
     

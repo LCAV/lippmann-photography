@@ -34,14 +34,15 @@ path_Suwannee = '/Multispectral image databases/Gulf_Wetlands_Sample_Rad/Suwanne
 path_PURDUE   = '/Purdue - DC'
 
 path_Gamaya = '/Gamaya/2016_12_12'
-path_HySpex = '/HySpex/2016_12_07/Lippmann-sample1_view-5deg_80000_us_1x_2016-12-07T172853_raw_rad_REF.mat'
-path_HySpex = '/HySpex/2016_12_07/Lippmann-sample1_view-35deg_80000_us_1x_2016-12-07T171000_raw_rad_REF.mat'
-path_HySpex = '/HySpex/2016_12_07/Lippmann-sample1_view-15deg_80000_us_1x_2016-12-07T171730_raw_rad_REF.mat'
+path_HySpex = '/Volumes/Gilles EPFL/Datasets/HySpex/2016_12_07/Lippmann-sample1_view-5deg_80000_us_1x_2016-12-07T172853_raw_rad_REF.mat'
+#path_HySpex = '/HySpex/2016_12_07/Lippmann-sample1_view-35deg_80000_us_1x_2016-12-07T171000_raw_rad_REF.mat'
+#path_HySpex = '/HySpex/2016_12_07/Lippmann-sample1_view-15deg_80000_us_1x_2016-12-07T171730_raw_rad_REF.mat'
 
 
 path_RGB = 'images/final_small2.jpg'
 path_RGB = 'images/final_raw_small.jpg'
 path_RGB = 'images/original_200_200.jpg'
+path_RGB = 'images/lippmann_image.jpg'
 
 # LOAD SPECTRUM FROM CAVE DATABASE
 #try:
@@ -69,7 +70,7 @@ direction2 = direction2/np.linalg.norm(direction2)
 #lippmann_plate = load_multispectral_image_Suwannee(dir + path_Suwannee)
 #lippmann_plate = load_multispectral_image_PURDUE(dir + path_PURDUE)
 #lippmann_plate = load_multispectral_image_Gamaya(dir + path_Gamaya, 'Lippmann_crop.tif')
-lippmann_plate = load_multispectral_image_HySpex(dir + path_HySpex)
+lippmann_plate = load_multispectral_image_HySpex(path_HySpex)
 
 """Convert to discrete uniformly-sampled spectrums"""
 # lippmann_plate = lippmann_plate.to_uniform_freq(N_samples)
@@ -81,7 +82,7 @@ lippmann_plate = load_multispectral_image_HySpex(dir + path_HySpex)
 #lippmann_plate.height = 200
 #lippmann_plate.width  = 200
 
-#lippmann_plate.compute_intensity()
+lippmann_plate.compute_intensity()
 
 #for i in range(30,lippmann_plate.reflectances.shape[2]):
 #    lippmann_plate.reflectances[:,:,i] = lippmann_plate.reflectances[:,:,-1]
@@ -97,8 +98,8 @@ lippmann_plate = load_multispectral_image_HySpex(dir + path_HySpex)
 
 #lippmann_plate.new_spectrums.blue_shift(1./np.cos(theta_o), extrapolation='cste')
 
-#lippmann_plate.spectrum.compute_rgb()
-#lippmann_plate.I_r.compute_rgb(sqrt=True)
+lippmann_plate.spectrum.compute_rgb()
+lippmann_plate.I_r.compute_rgb(sqrt=True)
 
 
 #gui_manager = GuiManager(lippmann_plate, normalize_spectrums=True, gamma_correct=True)
@@ -106,7 +107,7 @@ gui_manager = GuiManager(lippmann_plate, normalize_spectrums=True, gamma_correct
 gui_manager.show()
 
 #generate_interference_images(lippmann_plate)
-#extract_layers_for_artwork(lippmann_plate, 660, subtract_mean=False, normalize=True, negative=True)
+extract_layers_for_artwork(lippmann_plate, 660, subtract_mean=False, normalize=True, negative=True)
 
 
 

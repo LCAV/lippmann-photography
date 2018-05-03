@@ -45,10 +45,6 @@ def propagation_followed_by_boundary(n1, n2, phi):
 
 
 def propagation_arbitrary_layers(ns, k, d):
-    # start with an interface with air
-    #    n1 = 1
-    #    n2 = ns[0]
-    #    M = 1/(2*n2)*np.array([[n2+n1, n2-n1], [n2-n1, n2+n1]])
 
     M = np.eye(2)
 
@@ -58,7 +54,7 @@ def propagation_arbitrary_layers(ns, k, d):
         phi = n1 * k * d
         Mi = propagation_followed_by_boundary(n1, n2, phi)
 
-        M = M @ Mi
+        M = Mi @ M 
 
     S = from_S_to_M(M)
 
@@ -84,7 +80,7 @@ def dielectric_Brag_grating(N, n1, n2, phi1, phi2):
     return r, t
 
 
-def propagation_arbitrary_layers_spectrum(ns, d, lambdas, plot=True, symmetric=False):
+def propagation_arbitrary_layers_spectrum(ns, d, lambdas, plot=False, symmetric=False):
     ks = 2 * np.pi / lambdas
     if not hasattr(d, "__iter__"):
         d = np.ones_like(lambdas) * d
@@ -143,32 +139,36 @@ def propagation_Born(n, phi):
     return M
     
     
-def propagation_Lippmann_matrix(r, d, n, k0, epsilon=0.2E7):
+def propagation_Lippmann_matrix(r, d, n, k0, epsilon=3E7, approximation=True):
     
     phi = n*k0*d
 
     r *= d*epsilon
-#    r = np.sqrt(r) 
+#    r *= epsilon 
     
     t = np.sqrt(1-r**2)
-#    M = np.array([[1, 1j*r], [-1j*r, 1]])/t
+    if approximation:
+        M = np.array([[1, 1j*r], [0, 1]])
+#        M = np.array([[1, 0], [-1j*r, 1]])
+    else:        
+        M = np.array([[1, 1j*r], [-1j*r, 1]])/t
     
-    S = np.array([[t,1j*r], [1j*r,t]])
-    M = from_S_to_M(S)
     P = np.array([[np.exp(-1j * phi), 0], [0, np.exp(1j * phi)]])
     
     return M @ P
     
     
-def propagation_arbitrary_layers_Lippman(rs, ds, k, n):
+def propagation_arbitrary_layers_Lippman(rs, ds, k, n, epsilon=3E7, approximation=True):
 
     M = np.eye(2)
+    
+    #normalize rs
+    rs /= np.max(rs)
 
     for r, d in zip(rs, ds):
-        ()
-        Mi = propagation_Lippmann_matrix(r, d, n, k)
+
+        Mi = propagation_Lippmann_matrix(r, d, n, k, epsilon=epsilon, approximation=approximation)
         M = Mi @ M
-        
 
     S = from_S_to_M(M)
 
@@ -178,7 +178,7 @@ def propagation_arbitrary_layers_Lippman(rs, ds, k, n):
     return r, t
 
 
-def propagation_arbitrary_layers_Lippmann_spectrum(rs, d, lambdas, n0=1.45, plot=True, symmetric=False):
+def propagation_arbitrary_layers_Lippmann_spectrum(rs, d, lambdas, n0=1.45, plot=False, symmetric=False, epsilon=3E7, approximation=True):
     ks = 2 * np.pi / lambdas
     if not hasattr(d, "__iter__"):
         d = np.ones_like(rs) * d
@@ -194,7 +194,7 @@ def propagation_arbitrary_layers_Lippmann_spectrum(rs, d, lambdas, n0=1.45, plot
     total_transmittance = []
 
     for k in ks:
-        r, t = propagation_arbitrary_layers_Lippman(refl, dist, k, n0)
+        r, t = propagation_arbitrary_layers_Lippman(refl, dist, k, n0, epsilon=epsilon, approximation=approximation)
         total_reflectance.append(np.abs(r) ** 2)
         total_transmittance.append(np.abs(t) ** 2)
 
@@ -204,7 +204,7 @@ def propagation_arbitrary_layers_Lippmann_spectrum(rs, d, lambdas, n0=1.45, plot
         plt.title('Reflected spectrum with Lippmann matrices')
         plt.draw()
 
-    return total_reflectance, total_transmittance
+    return np.array(total_reflectance), np.array(total_transmittance)
 
 
 def propagation_arbitrary_layers_Born(ns, k, d):
@@ -217,7 +217,7 @@ def propagation_arbitrary_layers_Born(ns, k, d):
         phi = n * k * dist
         Mi = propagation_Born(n, phi)
 
-        M = M @ Mi
+        M = Mi @ M
 
     p_1 = ns[0]
     p_ell = ns[-1]
@@ -458,7 +458,7 @@ if __name__ == '__main__':
     plt.plot(lambdas, inverted_lippmann)
     plt.title('Inverse Lippmann transform (symmetric)')
     
-    r, t = propagation_arbitrary_layers_Lippmann_spectrum(rs=intensity/np.max(intensity), d=delta_z, lambdas=lambdas)
+    r, t = propagation_arbitrary_layers_Lippmann_spectrum(rs=intensity/np.max(intensity), d=delta_z, lambdas=lambdas, approximation=True)
 
     propagation_arbitrary_layers_spectrum(ns, d=delta_z, lambdas=lambdas, symmetric=True)
     propagation_arbitrary_layers_Born_spectrum(ns, d=delta_z, lambdas=lambdas)
