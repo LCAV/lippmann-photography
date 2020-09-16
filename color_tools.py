@@ -133,7 +133,8 @@ def from_spectrum_to_xyz(wavelengths, spectral_colors, integrate_nu=True, normal
     
     #'normalize'
     if normalize:
-        normalization_cste = np.max(Y)
+#        normalization_cste = np.max(Y)
+        normalization_cste = X+Y+Z
         X = X/normalization_cste
         Y = Y/normalization_cste
         Z = Z/normalization_cste

@@ -1,341 +1,539 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jun 10 11:19:49 2016
+Created on Thu Jun  1 14:01:34 2017
 
-@author: Gilles Baechler
+@author: gbaechle
 """
+
+
 import numpy as np
+import scipy as sp
+import scipy.stats
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from scipy.optimize import least_squares
+
+import seaborn as sns
+import seabornstyle as snsty
+
 import sys
-from mpl_toolkits.mplot3d import Axes3D
-from scipy import integrate
-from scipy.interpolate import interp1d
-from scipy.fftpack import dct
+sys.path.append("../")
+from multilayer_optics_matrix_theory import *
+import color_tools as ct
+import finite_depth_analysis as fda
 
-from spectrum import *
+snsty.setStyleMinorProject()
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
 
 
+plt.close('all')
+fig_path = 'Figures/'
 
-class Lippmann(object):
-    """Class defining a generic Lippmann object"""
 
-    # TODO It may be better to have "build" function for Lippmann (which does all the logic "if none" then sth
-    # or rewrite the data reading functions co that they return spectrum, not lippmann
-    # or pass the lippmann to those functions as a argument (so it can be pre-filled with stuff) 
+c0 = 299792458
+n0 = 1.5
+c = c0/n0
+
+
+def generate_gaussian_spectrum(lambdas, mu=550E-9, sigma=30E-9):
+    spectrum = sp.stats.norm(loc=mu, scale=sigma).pdf(lambdas)
+
+    return spectrum/np.max(spectrum)
+
+def generate_rect_spectrum(lambdas, start=450E-9, end=560E-9):
+    spectrum = np.zeros(len(lambdas))
+    spectrum[(lambdas >= start) & (lambdas <= end)] = 1
+
+    return spectrum
+
+def generate_mono_spectrum(lambdas, color=550E-9):
+    spectrum = np.zeros(len(lambdas))
+    spectrum[np.argmin(np.abs(lambdas - color))] = 1
+
+    return spectrum
+
+def lippmann_transform_complex(lambdas, spectrum, depths, r=-1, t=0):
     
-    def __init__(self, spectrum, n_x, n_y, r, direction=np.array([0.0, 0.0, 1.0]), light_spectrum=None, spectral_sensitivity=None, n=1.0, phi_0=np.pi/2.0, E_0=1):
-        
-        self.spectrum = spectrum
-        self.wavelengths = spectrum.wave_lengths
-        l = len(self.wavelengths)
-        
-        self._I = None
-        self._R = None
-        self._I_r = None
-        
-        #Physical constants
-        self.c0 = 299792458
-        self.c  = self.c0/n
-        self.epsilon_0 = 8.8541878176E-12        
+    k = 2 * np.pi / lambdas
+    omegas = 2*np.pi*c/lambdas
 
-        self.width  = n_x
-        self.height = n_y
-    
-        self.r = r
-        
-        self.E_0 = E_0
-        self.phi_0 = phi_0
-        self.A = E_0*np.exp(1j*phi_0)       #complex envelope
-        self.n = n
-        
-        self.direction = direction/np.linalg.norm(direction)  #make sure it is a unit vector
-        self.k         = 2*np.pi/self.wavelengths                 #wavenumber
-        self.k_vec     = self.k[None,:]*direction[:,None]     #wavevector
-        self.omega     = self.k*self.c                        #angular freq
-        self.nu        = self.omega/(2*np.pi)
-        
-        #If the incoming light spectrum is not provided, assume uniform light
-        if light_spectrum is None:
-            self.light_spectrum = Spectrum( self.wavelengths, np.ones(l) )
-        else:
-            self.light_spectrum = light_spectrum
-    
-        #If the spectral sensitivity is not provided, assume uniform spectral sensitivity
-        if spectral_sensitivity is None:
-            self.spectral_sensitivity = Spectrum( self.wavelengths, np.ones(l) )
-        else:
-            self.spectral_sensitivity = spectral_sensitivity  
-            
-        self.plate_type = 'continuous'
-            
-    def phases(self, r=None, sym=False):
-        #returns the phase of the reflected wave
-        if r is None:
-            r = self.r
-        return self.phi_0 + (2*sym-1)*r @ self.k_vec
-        
-    def complex_amplitude(self, r=None):
-        if r is None:
-            r = self.r
-        return self.A*np.exp( -1j*r @ self.k_vec)
-        
-        
-    def compute_wave_function(self, t, r=None, real=True):
-        """Compute the incoming wave function."""        
-        
-        U_r = self.complex_amplitude(r)
-        U_t = np.exp(1j*np.outer(self.omega, t))
-        
-        print(U_r.shape)
-        print(U_t.shape)
+    return -np.trapz( np.sqrt(spectrum[None, :])*np.exp(-1j*omegas[None, :]*t)*(np.exp(-1j*k[None, :]*depths[:, None]) + r*np.exp(1j*k[None, :]*depths[:, None])), omegas, axis=1)
 
-        #numerical integration
-        w_f = np.trapz(y=(U_r[:,:,None] * U_t[None,:,:]), x=self.wavelengths, axis=1)
-        
-        if real:
-            return np.real(w_f)
-        else:
-            return w_f
-  
-        
-    def compute_intensity(self):
-        """Compute the intensity of the interference field as well as the reflectivity of the Lippmann plate"""
-        raise NotImplementedError( "This function should be implemented" )
-        
-    def replay(self):
-        """Compute the corresponding spectrum reflected by the Lippmann plate"""
-        raise NotImplementedError( "This function should be implemented" )
-            
 
-    @property
-    def I(self):
-        if self._I is None:
-            self.compute_intensity()
-        return self._I
-        
-    @I.setter
-    def I(self, value):
-        self._I = value
-        
-    @property
-    def R(self):
-        if self._R is None:
-            self.compute_intensity()
-        return self._R
-    
-    @R.setter
-    def R(self, value):
-        self._R = value
-        
-    @property
-    def I_r(self):
-        if self._I_r is None:
-            self.replay()
-        return self._I_r
-    
-    @I_r.setter
-    def I_r(self, value):
-        self._I_r = value
-        
-    def __str__(self):
-        return self.plate_type + ' Lippmann plate of size (' + str(self.width) + ', ' + str(self.height) + ')' 
-    
-        
+def lippmann_transform(lambdas, spectrum, depths, r=-1, k0=0):
+    two_k = 4 * np.pi / lambdas
+    omegas = 2*np.pi*c/lambdas
+    theta = np.angle(r)
+    rho   = np.abs(r)
 
-class LippmannContinuous(Lippmann):
-    """Class defining a 'continuous' Lippmann object"""
-    
-    def __init__(self, wavelengths, n_x, n_y, r=None, direction=np.array([0.0, 0.0, 1.0]), light_spectrum=None, spectral_sensitivity=None, n=1.0, E_0=1.0, phi_0=np.pi/2.0):
+    cosine_term = (1 + rho**2 + 2*rho*np.cos(two_k[None, :] * depths[:, None] + theta))
+    cosines = 2*rho*np.cos(two_k[None, :] * depths[:, None] + theta)
 
-        l = len(wavelengths)
-        spectrum = Spectrum3D(wavelengths, np.zeros([n_x, n_y, l]))
-        
-        #default depth discretization
-        if r is None:
-            print("create r")
-            n_space = 1000
-            self.r = np.zeros([n_space, 3])
-            self.r[:,2] = np.linspace(0, 100.0E-6, n_space)
-        else:
-            self.r = r
+    intensity = -np.trapz(cosine_term * spectrum[None, :], omegas, axis=1)
+    delta_intensity = -np.trapz(cosines * spectrum[None, :], omegas, axis=1)
+    
+    window = np.exp(-k0/np.max(depths)*depths)
+    
+    return intensity*window, delta_intensity
+
+def inverse_lippmann(intensity, lambdas, depths, symmetric=False, return_intensity=True):
+    two_k = 4 * np.pi / lambdas
+    
+    if symmetric:
+        I = np.r_[intensity[:0:-1], intensity]
+        d = np.r_[-depths[:0:-1], depths]
+    else:
+        I = intensity
+        d = depths
+
+    exponentials = np.exp(-1j * two_k[:, None] * d[None, :])
+    if return_intensity:
+        return np.abs(np.trapz(exponentials * I[None, :], d, axis=1)) ** 2
+    else:
+        return np.trapz(exponentials * I[None, :], d, axis=1)
+
+
+def lippmann_transform_reverse(lambdas, intensity, depths, r=-1):
+    two_k = 4 * np.pi / lambdas
+    theta = np.angle(r)
+    
+    nu = 2*np.mod(-theta, 2*np.pi)/np.pi
+    
+    I = intensity - np.mean(intensity)
+    
+    integrand = (two_k[:,None]*depths[None,:])**nu * \
+                (sp.special.hyp1f1(1,1+nu, 1j*two_k[:,None]*depths[None,:]) + \
+                 sp.special.hyp1f1(1,1+nu, -1j*two_k[:,None]*depths[None,:]))
                 
-        super().__init__(spectrum, n_x, n_y, r=self.r, direction=direction, light_spectrum=light_spectrum, spectral_sensitivity=spectral_sensitivity, n=n, phi_0=phi_0)
-        
-        self.plate_type = 'continuous'        
-        
-        
-    def compute_intensity(self):
-            
-        self._I   = np.zeros([self.width, self.height, self.r.shape[0]])
-        self._R   = np.zeros([self.width, self.height, self.r.shape[0]])
-        
-        kTr       = self.r @ self.k_vec #what is r? Maybe we need only z component of it?
-        sines     = 0.5*(1 - np.cos(2.0*self.n*kTr))
-        
-        i = self.light_spectrum.intensities[:, None] * sines.T
-        r = self.spectral_sensitivity.intensities[:, None] * \
-            self.light_spectrum.intensities[:, None] * sines.T
-        
-        for x in range(self.width):
-            perc = np.double(x)/np.double(self.width-1)*100
-            sys.stdout.write("\rComputing intensity: %.2f %%" %perc)
-            sys.stdout.flush()                
-            
-            for y in range(self.height):
-                integrand_i = self.spectrum.intensities[x, y, :, None] * i
-                integrand_r = self.spectrum.intensities[x, y, :, None] * r
+    return 2/(c*np.pi*sp.special.gamma(nu+1)) * np.trapz(integrand * I[None,:], depths, axis=1)
     
-#                self._I[x, y,:] = np.trapz(y=integrand_i, x=self.nu, axis=0)
-#                self._R[x, y,:] = np.trapz(y=integrand_r, x=self.nu, axis=0)
-                self._I[x, y,:] = np.trapz(y=integrand_i, axis=0)
-                self._R[x, y,:] = np.trapz(y=integrand_r, axis=0)
-                
-                
-        sys.stdout.write("\nIntensity computed!\n")
-        
-        
-    def replay(self, wavelengths=None, direction=np.array([0.0, 0.0, 1.0])):
-        
-        if self._I_r is None:
-            
-            if self._R is None:
-                self.compute_intensity()            
-            
-            if wavelengths is None:
-                wavelengths=self.wavelengths
 
-            direction = direction / np.linalg.norm(direction)
-                
-            self._I_r = Spectrum3D(wavelengths, np.zeros([self.width, self.height, len(wavelengths)]))
-
-            new_k_vec = self.k[None, :] * direction[:, None]
-
-            kTr     = self.r @ new_k_vec
-            cosines = np.cos(2*self.n*kTr).T
-                            
-            for x in range(self.width):
-                perc = x/(self.width-1)*100
-                sys.stdout.write("\rComputing new spectrum: %.2f %%" %perc)
-                sys.stdout.flush() 
-                
-                for y in range(self.height):
-                    
-                    integrand = self._R[x, y, :, np.newaxis] * cosines.T
-                    
-#                    self.new_spectrums.set_spectrum( x, y, 0.5*self.c*self.epsilon_0*self.light_spectrum.intensities * np.trapz(y=integrand, x=self.r[:,2], axis=0)**2 )
-                    self._I_r.set_spectrum( x, y, self.light_spectrum.intensities * np.trapz(y=integrand, x=self.r[:,2], axis=0)**2 )
-            
-            sys.stdout.write("\nNew spectrum computed!\n")
-            
-        return self._I_r
-        
-        
-    def to_uniform_freq(self, N_prime):
+def inverse_lippmann_reverse(depths, spectrum, lambdas, initial_estimate=None):
     
-        lambda_max = np.max(self.wavelengths)
-        lippmann_discrete = LippmannDiscrete(N_prime, self.width, self.height, lambda_max=lambda_max,  light_spectrum=self.light_spectrum, \
-                            spectral_sensitivity=self.spectral_sensitivity, n=self.n, E_0=self.E_0, phi_0=self.phi_0)
-                            
-        old_wave_lengths = self.wavelengths
-        new_wave_lengths = lippmann_discrete.spectrum.wave_lengths
+    if initial_estimate is None:
+        initial_estimate = np.ones_like(depths)
 
-        #interpolate
-        f1 = interp1d(old_wave_lengths, self.spectrum.intensities, axis=2, fill_value='extrapolate')
-        f2 = interp1d(old_wave_lengths, self.light_spectrum.intensities, fill_value='extrapolate')
-        f3 = interp1d(old_wave_lengths, self.spectral_sensitivity.intensities, fill_value='extrapolate')
-        lippmann_discrete.spectrum.intensities = f1(new_wave_lengths)
-        lippmann_discrete.light_spectrum.intensities = f2(new_wave_lengths)
-        lippmann_discrete.spectral_sensitivity.intensities = f3(new_wave_lengths)
-        
-        return lippmann_discrete
-          
+    lippmann_error = lambda intensity: inverse_lippmann(intensity, lambdas, depths) - spectrum
+    return least_squares(fun=lippmann_error, x0=initial_estimate, verbose=2, max_nfev=300, gtol=1E-100, method='trf', bounds=(0,np.inf)).x
+
+
+def apply_h_reverse(lambdas, spectrum, Z, r=-1, initial_estimate=None):
     
-        
-class LippmannDiscrete(Lippmann):
-    """Class defining a discrete Lippmann object"""
+    if initial_estimate is None:
+        initial_estimate = np.ones_like(depths)
+
+    lippmann_error = lambda original: np.abs( fda.apply_h(original, Z, lambdas, lambdas, r=r) )**2 - spectrum
+    return least_squares(fun=lippmann_error, x0=initial_estimate, verbose=2, max_nfev=300, gtol=1E-100, method='trf', bounds=(0,np.inf)).x
+
+
+
+
+def plot_gaussian_lippmann_and_inverses():  
     
-    def __init__(self, N_prime, n_x, n_y, lambda_min=390E-9, lambda_max=700E-9, direction=np.array([0.0, 0.0, 1.0]), light_spectrum=None, spectral_sensitivity=None, n=1.0, E_0=1.0, phi_0=np.pi/2.0):
-        
-        self.c = 299792458      
-        
-        #reds (or higher)
-        v_min = self.c/lambda_max
-        #blues
-        v_max = self.c/lambda_min      
-        
-        self.N_prime = N_prime
-        self.N = np.int( np.floor(N_prime*v_max/(v_max-v_min)) ) 
-        
-        self.f_max = 4./(lambda_min)
-        self.df    = self.f_max/(self.N-1)
-        self.dr    = 1./(2.*self.f_max)         
-        
-        self.z           = np.arange(self.N)*self.dr
-        self.r           = np.zeros([self.N, 3])
-        self.r[:,2]      = self.z
-        
-        self.f           = np.arange(self.N)*self.df
-        self.wavelengths     = 2./self.f[-self.N_prime:]
-
-        spectrum = Spectrum3D(self.wavelengths, np.zeros([n_x, n_y, N_prime]))
-
-        super().__init__(spectrum, n_x, n_y, r=self.r, direction=direction, light_spectrum=light_spectrum, spectral_sensitivity=spectral_sensitivity, n=n, phi_0=phi_0)
-
-        self.plate_type = 'discrete'  
-        
-        
-    def compute_intensity(self):
-        
-        if self._I is None:
-            
-            self._I = np.zeros([self.width, self.height, self.N])
-            self._R = np.zeros([self.width, self.height, self.N])
-                        
-            for x in range(self.width):
-                perc = np.double(x)/np.double(self.width-1)*100
-                sys.stdout.write("\rComputing intensity: %.2f %%" %perc)
-                sys.stdout.flush() 
-                
-                for y in range(self.height):
-                    
-                    #pad zeros to account for the lowpass band
-                    x_i = np.hstack( [ np.zeros(self.N-self.N_prime), self.spectrum.intensities[x, y, :]*self.light_spectrum.intensities ] )
-                    x_r = np.hstack( [ np.zeros(self.N-self.N_prime), self.spectrum.intensities[x, y, :]*self.spectral_sensitivity.intensities*self.light_spectrum.intensities ] )
-
-                    g_i = dct(x=x_i, type=1)
-                    g_r = dct(x=x_r, type=1)
-
-                    self._I[x, y,:]  = g_i[0] - g_i
-                    self._R[x, y,:] = g_r[0] - g_r
-
-                    
-    def replay(self):
-                
-        if self._I_r is None:
-            
-            if self._R is None:
-                self.compute_intensity()           
-                
-            self._I_r = Spectrum3D(self.wavelengths, np.zeros([self.width, self.height, self.N_prime]))
-   
-   
-            for x in range(self.width):
-                perc = np.double(x)/np.double(self.width-1)*100
-                sys.stdout.write("\rComputing new spectrum: %.2f %%" %perc)
-                sys.stdout.flush()
-                
-                for y in range(self.height):
-                    
-                    #Normalize    
-                    G = 1./(2*(self.N-1))*dct(self._R[x,y,:], type=1)
-                    self._I_r.set_spectrum( x, y, self.light_spectrum.intensities*G[-self.N_prime:]**2 )
-            
+    lambdas, omegas = generate_wavelengths(500) #3000
+    depths = generate_depths(max_depth=5E-6)
+    
+    spectrum = generate_gaussian_spectrum(lambdas=lambdas, mu=550E-9, sigma=30E-9)
+    
+    lippmann = plot_spectrums_and_methods(lambdas, depths, spectrum, n0, name='gaussian')
+    
+    return lambdas, depths, spectrum, lippmann
+    
+    
+def plot_mono_lippmann_and_inverses():   
+    
+    lambdas, omegas = generate_wavelengths(500)
+    depths = generate_depths(max_depth=5E-6)
+    
+    spectrum = generate_mono_spectrum(lambdas=lambdas, color=600E-9)
+    
+    lippmann = plot_spectrums_and_methods(lambdas, depths, spectrum, n0, name='mono')
+    
+    return lambdas, depths, spectrum, lippmann
+    
+    
+def plot_rect_lippmann_and_inverses():  
+    
+    lambdas, omegas = generate_wavelengths(500)
+    depths = generate_depths(max_depth=5E-6)
+    
+    spectrum = generate_rect_spectrum(lambdas=lambdas, start=480E-9, end=580E-9)
+    
+    lippmann = plot_spectrums_and_methods(lambdas, depths, spectrum, n0, name='rect')
      
+    return lambdas, depths, spectrum, lippmann
+    
+      
+def plot_spectrums_and_methods(lambdas, depths, spectrum, n0, name):
+    
+    f, (ax1, ax2) = plt.subplots(1, 2)
+    
+    show_spectrum(lambdas, spectrum, ax=ax1)
+     
+    lippmann, delta_lippmann = lippmann_transform(lambdas/n0, spectrum, depths)
+    show_lippmann_transform(depths, lippmann, ax=ax2)
+    plt.savefig(fig_path + name + '.pdf') 
+    plt.show()
+    
+    spectrum_inverse_lippmann = inverse_lippmann(lippmann, lambdas/n0, depths)
+    plt.figure()    
+    show_spectrum(lambdas, spectrum_inverse_lippmann, ax=plt.gca())
+    plt.savefig(fig_path + name + '_inverse_lippmann.pdf') 
+    plt.show()
+    
+    ns = generate_lippmann_refraction_indices(delta_lippmann, n0=n0, mu_n=0.01)
+    spectrum_inverse_nareid, _ = propagation_arbitrary_layers_spectrum(ns, d=10E-9, lambdas=lambdas, plot=False)
+    
+    plt.figure()    
+    show_spectrum(lambdas, spectrum_inverse_nareid, ax=plt.gca())
+    plt.savefig(fig_path + name + '_inverse_nareid.pdf') 
+    plt.show() 
+    
+    return lippmann
+      
+def show_lippmann_transform(depths, lippmann, ax=None, black_theme=False, complex_valued=False, nolabel=False, short_display=False, label=''):
+    
+    z = depths*1E6
+    
+    if ax is None:
+        plt.figure()
+        ax=plt.gca()
+  
+    vmax = 1.1*np.max(np.abs(lippmann))
+    ax.plot(z, np.real(lippmann), linewidth=1.0, zorder=-1, alpha=1.)
+    if complex_valued:
+        ax.plot(z, np.imag(lippmann), linewidth=1.0, zorder=-2, alpha=1., c='0.7')
+        ax.set_ylim(-vmax, vmax)
+        ax.set_yticks([0])
+    else:
+        ax.set_ylim(0, vmax)
+        ax.set_yticks([])
+    ax.set_xlim([np.min(z), np.max(z)])
+    
+    if black_theme:
+        ax.set_xticks([])
+        
+    if not nolabel and not short_display:
+        ax.set_xlabel('Depth ($\mu m$)')
+       
+    if not nolabel and short_display:
+        ax.set_xticks([0, depths[-1]*1E6/2, depths[-1]*1E6])
+        ax.set_xticklabels([0, 'Depth ($\mu m$)', int(np.round(depths[-1]*1E6))])  
+        ax.set_xlabel(label)
+    
+
+def show_spectrum(lambdas, spectrum, ax=None, visible=False, true_spectrum=True, vmax=None, show_background=False, lw=1, nolabel=False, short_display=False, label=''):
+    
+    if visible:
+        spectrum = spectrum[(lambdas <= 700E-9) & (lambdas >= 400E-9)]
+        lambdas = lambdas[(lambdas <= 700E-9) & (lambdas >= 400E-9)]
+    
+    lam = lambdas*1E9
+    
+    if ax is None:
+        plt.figure()
+        ax=plt.gca()
+    
+    L = len(lam)
+    
+    if true_spectrum:
+        cs = [wavelength_to_rgb(wavelength) for wavelength in lam]
+#        cs = lambdas_to_rgb(lambdas)
+    else:
+        colors = plt.cm.Spectral_r(np.linspace(0, 1, L))
+        cs = [colors[i] for i in range(L)]
+    
+#    ax.scatter(lam, spectrum, color=cs, s=10)
+#    ax.plot(lam, spectrum, '--k', linewidth=0.5, zorder=-1, alpha=0.5, dashes=(2,2))
+    fda.plot_gradient_line(lam, spectrum, ax=ax, zorder=-1, lw=lw, cs=cs)
+    ax.set_xlim([np.min(lam), np.max(lam)])
+    if vmax is None:
+        vmax = 1.1*np.max(spectrum)
+        
+    ax.set_ylim(0, vmax)
+    ax.set_yticks([])
+    
+    if not nolabel and not short_display:
+        ax.set_xticks([400, 500, 600, 700])
+        ax.set_xlabel('Wavelength ($nm$)')
+        
+    if not nolabel and short_display:
+        ax.set_xticks([400, 550, 700])
+        ax.set_xticklabels([400, '$\lambda$ ($nm$)', 700])
+        ax.set_xlabel(label)
+        
+    
+    if show_background:
+        col = ct.from_xyz_to_rgb( ct.from_spectrum_to_xyz(lambdas, spectrum).reshape((1,1,-1)) ).flatten()
+        ax.add_patch(patches.Rectangle((lam[0], 0.95*vmax), lam[-1]-lam[0], 1.05*vmax, facecolor=col, edgecolor='none', zorder=-10))
+#        ax.set_facecolor(col)
+    
+def lambdas_to_rgb(lambdas):
+    
+    colors_XYZ = np.zeros((len(lambdas), 3))
+    for i, lambd in enumerate( lambdas ):
+    
+        spectrum = generate_mono_spectrum(lambdas=lambdas, color=lambd)
+        colors_XYZ[i, :] = -ct.from_spectrum_to_xyz(lambdas, spectrum, normalize=False)
+        
+
+    #normalize colors
+    colors_xyz = colors_XYZ/np.max(colors_XYZ[:,1])
+    colors_rgb = ct.from_xyz_to_rgb(colors_xyz.reshape((-1,1,3)), normalize=False).reshape((-1,3))
+    colors_rgb /= np.max(colors_rgb)
+    
+    return colors_rgb
+    
+def wavelength_to_rgb(wavelength, gamma=0.8):
+    '''This converts a given wavelength of light to an 
+    approximate RGB color value. The wavelength must be given
+    in nanometers in the range from 380 nm through 750 nm
+    (789 THz through 400 THz).
+
+    Based on code by Dan Bruton
+    http://www.physics.sfasu.edu/astro/color/spectra.html
+    '''
+
+    wavelength = float(wavelength)
+    if wavelength >= 380 and wavelength <= 440:
+        attenuation = 0.3 + 0.7 * (wavelength - 380) / (440 - 380)
+        R = ((-(wavelength - 440) / (440 - 380)) * attenuation) ** gamma
+        G = 0.0
+        B = (1.0 * attenuation) ** gamma
+    elif wavelength >= 440 and wavelength <= 490:
+        R = 0.0
+        G = ((wavelength - 440) / (490 - 440)) ** gamma
+        B = 1.0
+    elif wavelength >= 490 and wavelength <= 510:
+        R = 0.0
+        G = 1.0
+        B = (-(wavelength - 510) / (510 - 490)) ** gamma
+    elif wavelength >= 510 and wavelength <= 580:
+        R = ((wavelength - 510) / (580 - 510)) ** gamma
+        G = 1.0
+        B = 0.0
+    elif wavelength >= 580 and wavelength <= 645:
+        R = 1.0
+        G = (-(wavelength - 645) / (645 - 580)) ** gamma
+        B = 0.0
+    elif wavelength >= 645 and wavelength <= 750:
+        attenuation = 0.3 + 0.7 * (750 - wavelength) / (750 - 645)
+        R = (1.0 * attenuation) ** gamma
+        G = 0.0
+        B = 0.0
+    else:
+        R = 0.0
+        G = 0.0
+        B = 0.0
+    R *= 255
+    G *= 255
+    B *= 255
+    return np.array([int(R), int(G), int(B), 255])/255.
+
+
+def generate_wavelengths(N=300, omega_low=None, c=c):
+    
+    lambda_low = 390E-9
+    lambda_high = 700E-9
+    if omega_low is None:
+        omega_low = 2 * np.pi * c / lambda_high
+    omega_high = 2 * np.pi * c / lambda_low
+    omegas = np.linspace(omega_high, omega_low, N)
+    lambdas = 2 * np.pi * c / omegas
+
+    return lambdas, omegas
+
+
+def generate_wavelengths_sinc(Z, omega_low=None, symmetric=False, c=c):
+    
+    lambda_low = 390E-9
+    lambda_high = 700E-9
+
+    if omega_low is None:
+        omega_low = 2 * np.pi * c / lambda_high
+    omega_high = 2 * np.pi * c / lambda_low
+    
+    if symmetric:
+        omegas = np.arange(0, omega_high, np.pi*c/(2*Z))[::-1]
+    else:
+        omegas = np.arange(0, omega_high, np.pi*c/(Z))[::-1]
+    omegas = omegas[omegas >= omega_low]
+    
+    lambdas = 2 * np.pi * c / omegas
+
+    return lambdas, omegas   
+
+def generate_wavelengths_sinc_new(Z, omegas, c=c): 
+    
+    mi = np.min(omegas)
+    ma = np.max(omegas)
+    
+    Z *= 2
+    
+    if mi < 0:
+        omegas_sinc_p = np.arange(0, ma, np.pi*c/Z)
+        omegas_sinc_n = np.arange(0, mi, -np.pi*c/Z)[::-1]
+        omegas_sinc = np.r_[omegas_sinc_n[:-1], omegas_sinc_p]
+    else:
+        omegas_sinc = np.arange(0, ma, np.pi*c/Z)
+        omegas_sinc = omegas_sinc[omegas_sinc >= mi]
+        
+    omegas_sinc = omegas_sinc[::-1]
+    lambdas_sinc = 2 * np.pi * c / omegas_sinc
+    
+    return lambdas_sinc, omegas_sinc
+        
+    
+def generate_depths(delta_z=10E-9, max_depth=10E-6):
+    
+    return np.arange(0, max_depth-delta_z, delta_z)
+
+
+if __name__ == '__main__':
+    
+    plt.close('all') 
+    
+    Z = 5E-6
+    N = 500
+    
+    r = 0.5*np.exp(-1j*1.256)
+    r = -1
+    
+    lambdas, omegas = generate_wavelengths(N) #3000
+    depths = np.linspace(0,Z*(1-1/N),N)
+#    depths = generate_depths(max_depth=5E-6)
+    omegas = 2 * np.pi * c / lambdas 
+    
+    spectrum = generate_gaussian_spectrum(lambdas=lambdas, mu=550E-9, sigma=30E-9)
+#    spectrum = generate_gaussian_spectrum(lambdas, mu=650E-9, sigma=30E-9) + 1.4*generate_gaussian_spectrum(lambdas, mu=450E-9, sigma=20E-9)
+#    spectrum = generate_mono_spectrum(lambdas=lambdas, color=530E-9)
+    spectrum /= np.max(spectrum)
+    
+    lippmann, delta_lippmann = lippmann_transform(lambdas, spectrum, depths, r=r)   
+#    lippmann /= np.max(lippmann)
+    
+    spectrum_reconstructed = lippmann_transform_reverse(lambdas, lippmann, depths, r=r)
+        
+#    f, (ax1, ax2, ax3) = plt.subplots(1, 3)
+#    f, (ax1, ax2) = plt.subplots(1, 2, figsize=(1.2*3.45/0.6, 0.7*3.45/0.6))
+    f, (ax1, ax2) = plt.subplots(1, 2)
+    show_spectrum(lambdas, spectrum, ax=ax1, short_display=True)
+    show_lippmann_transform(depths, lippmann, ax=ax2, short_display=True)
+    ax1.set_xlabel('(a) Spectrum')
+    ax2.set_xlabel('(b) Interference patterns')
+    plt.savefig(fig_path + 'gaussian.pdf')
+#    show_spectrum(lambdas, spectrum_reconstructed, ax=ax3)
+    
+        
+    spectrum_filtered =  fda.apply_h(spectrum, Z, lambdas, lambdas, r=r)
+    spectrum_reconstructed = inverse_lippmann(lippmann, lambdas, depths, symmetric=False)
+    lippmann_retransform, redelta_lippmann = lippmann_transform(lambdas, spectrum_reconstructed, depths, r=r)
+#    lippmann_retransform = inverse_inverse_lippmann(spectrum_reconstructed**2, lambdas/n0, depths)  
+    
+#    C = np.trapz(np.sqrt(spectrum_reconstructed), omegas)
+#    C = -np.trapz(spectrum, omegas)/2
+#    box_spectrum = inverse_lippmann(C*np.ones_like(depths), lambdas, depths)
+#    
+#    spectrum_cleaned = (np.sqrt(spectrum_reconstructed)-np.sqrt(box_spectrum))**2
+    
+#    spectrum_reverse = lippmann_transform_reverse(lambdas, lippmann, depths, r=r)
+#    lippmann_reverse = inverse_lippmann_reverse(depths, spectrum_reconstructed, lambdas, initial_estimate=np.maximum( lippmann_retransform/np.max(lippmann_retransform)*np.max(lippmann), 0 ))
+#    filtered_reverse = apply_h_reverse(lambdas, spectrum_filtered, Z, r=-1, initial_estimate=spectrum_filtered/np.max(spectrum_filtered)*np.max(spectrum))
+    
+    f, axes = plt.subplots(2,2, figsize=(1.2*3.45/0.6, 0.7*3.45/0.6), sharex='col')
+    show_spectrum(lambdas, spectrum, ax=axes[0,0], true_spectrum=False)
+    show_spectrum(lambdas, np.abs(spectrum_filtered)**2, ax=axes[0,1], true_spectrum=False)
+    plt.savefig('lippmann_pairs.pdf')
+    
+#    spectrum_reverse = np.load('spectrum_reverse.npy')
+    lippmann_reverse = np.load('lippmann_reverse.npy')
+#    filtered_reverse = np.load('filtered_reverse.npy')
+#    
+#    
+#    
+#    f, axes = plt.subplots(2, 2, figsize=(3.45, 3.45), sharex='col')
+#    show_spectrum(lambdas, spectrum, ax=axes[0,0]) 
+#    axes[0,0].set_xlabel('')
+#    show_lippmann_transform(depths, lippmann, ax=axes[0,1]) 
+#    axes[0,1].set_xlabel('')
+#    show_spectrum(lambdas, spectrum_reverse, ax=axes[1,0]) 
+#    show_lippmann_transform(depths, lippmann_transform(lambdas, spectrum_reverse, depths, r=r)[0], ax=axes[1,1]) 
+#    axes[1,1].set_xticks(np.arange(5))
+#    plt.savefig('same_lippmann.pdf')
+#    
+    f, axes = plt.subplots(2, 2, figsize=(3.45/0.5*0.6, 3.45/0.5*0.6), sharex='col')
+    show_lippmann_transform(depths, lippmann, ax=axes[0,0])
+    axes[0,0].set_xlabel('')
+    show_spectrum(lambdas, spectrum_reconstructed, ax=axes[0,1]) 
+    axes[0,1].set_xlabel('')
+    show_lippmann_transform(depths, lippmann_reverse, ax=axes[1,0]) 
+    show_spectrum(lambdas, inverse_lippmann(lippmann_reverse, lambdas, depths), ax=axes[1,1]) 
+    axes[1,0].set_xticks(np.arange(5))
+    plt.savefig('same_spectrum.pdf')
+#    
+#    f, axes = plt.subplots(2, 2, figsize=(3.45, 3.45), sharex='col')
+#    show_spectrum(lambdas, spectrum, ax=axes[0,0])
+#    show_spectrum(lambdas, spectrum_reconstructed, ax=axes[0,1]) 
+#    show_spectrum(lambdas, filtered_reverse, ax=axes[1,0]) 
+#    show_spectrum(lambdas, np.abs( fda.apply_h(spectrum, Z, lambdas, lambdas, r=-1) )**2, ax=axes[1,1]) 
+#    plt.savefig('same_filtered.pdf')
+#
+#
+#    f, (ax1, ax2) = plt.subplots(1, 2)
+#    show_spectrum(lambdas, spectrum, ax=ax1, label='(a) Spectrum')
+#    show_lippmann_transform(depths, lippmann, ax=ax2, short_display=True, label='(b) Interference patterns')
+#
+#    plt.savefig(fig_path + 'gaussian.pdf') 
+
+    
+#    plt.figure()
+#    show_lippmann_transform(depths, lippmann, ax=plt.gca()) 
+#    plt.savefig('lippmann.pdf')
+#    plt.title('Lippmann transform')
+    
+#    plt.figure()
+#    show_lippmann_transform(depths, lippmann_retransform, ax=plt.gca()) 
+#    plt.title('Lippmann retransform')    
+    
+#    plt.figure()
+#    show_spectrum(lambdas, spectrum, ax=plt.gca()) 
+#    plt.title('Original spectrum') 
+    
+#    plt.figure()
+#    show_spectrum(lambdas, spectrum_reconstructed, ax=plt.gca()) 
+#    plt.title('Spectrum reconstructed (inverse Lippmann)') 
     
 
 
+    
+#    plt.figure()
+#    show_spectrum(lambdas, box_spectrum, ax=plt.gca()) 
+#    plt.title('Spectrum box') 
+    
+#    plt.figure()
+#    show_spectrum(lambdas, spectrum_cleaned, ax=plt.gca()) 
+#    plt.title('Spectrum cleaned') 
 
-        
-        
+    
+    
+#    plt.figure()
+#    show_spectrum(lambdas, np.real(spectrum_amp), ax=plt.gca()) 
+#    plt.title('Spectrum reconstructed (amplitude)') 
+    
+    
+    
+#    plt.figure()
+#    show_spectrum(lambdas, spectrum_re_reconstructed, ax=plt.gca()) 
+#    plt.title('Spectrum re-reconstructed (inverse Lippmann)') 
+    
+#    spectrum_cosine = inverse_lippmann_cosine(lippmann_retransform, lambdas/n0, depths)
+#    plt.figure()
+#    show_spectrum(lambdas, spectrum_cosine, ax=plt.gca()) 
+#    plt.title('Spectrum inverse cosine') 
+    
+    
+#    plot_mono_lippmann_and_inverses()
+#    plot_rect_lippmann_and_inverses()
     
     

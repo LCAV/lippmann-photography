@@ -5,3 +5,9 @@
 *.csv
 *.lipp
 .directory
+*.zip
+.ipynb_checkpoints/*
+2018-10-05 PhotoPlateGentet_Transmission/*
+Cubes/*
+Elysee_short/*
+Nature/*
