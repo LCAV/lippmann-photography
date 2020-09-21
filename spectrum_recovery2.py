@@ -17,6 +17,7 @@ from lippmann import *
 from lippmann2 import *
 import display_spectral_data as dsd
 from safe_save import *
+import time
 
 c0 = 299792458
 n0 = 1.5
@@ -192,7 +193,7 @@ def forward_model(omegas, spectrum, r, Z, k0):
     return B @ spectrum
 
 
-def spectrum_recovery(omegas, signal_measured, r=-1, Z=6E-6, k0=0, infinite=True, n_iter=20, plot=False,
+def spectrum_recovery(omegas, signal_measured, r=-1, Z=6E-6, k0=0, infinite=True, n_iter=200, plot=False,
                       estimate_depth=True):
     lambdas = 2 * np.pi * c / omegas
     signal_est = None
@@ -398,33 +399,35 @@ if __name__ == '__main__':
     Z = 5E-6
     k0 = 1
     r = 0.7 * np.exp(1j * np.deg2rad(148))
-    n_iter = 5
+    n_iter = 400
+    visible = True
 
-    path = 'Elysee_short/'
-
-    length = len(glob.glob(path + '/*.txt'))
-
+    path = 'Cubes/'
 
     omegas = np.linspace(2 * np.pi * c / 400E-9, 2 * np.pi * c / 700E-9, N)
     lambdas = 2 * np.pi * c / omegas
 
-    for i, file in enumerate(glob.glob(path + '/*.txt')):
+    for i, file in enumerate(glob.glob(path + '/*.dat')):
         name = file.split('/')[-1][:-4]
-        print(name)
-        spectrum_est, Z_est, k0_est = spectrum_recovery_spectrometer(path, name + ".txt", N=200, r=r, visible=True,
-                                                                     normalize=False, n_iter=n_iter)
+        print("processing file", name)
 
+        data, wavelengths = dsd.load_specim_data(path+name, ds=25)
+        # spectrum_est, Z_est, k0_est = spectrum_recovery_spectrometer(path, name + ".txt", N=200, r=r, visible=True,
+        #                                                              normalize=False, n_iter=n_iter)
+
+        start = time.time()
+        spectrum_est, Z_est, k0_est, spec_lp = spectrum_recovery_data(wavelengths, data[0, 0, :], N=len(wavelengths), r=r,
+                                                                      visible=visible,
+                                                                      Z=30E-6, n_iter=n_iter)
+        print(f"Time elapsed: {time.time() - start}")
         f, axes = plt.subplots(1, 2, figsize=(3.45 / 0.5, 3.45), sharex='col')
 
         # original
-        lambdas_, spectrum, _ = dsd.read_file(path + name + '.txt')
+        lambdas_, spectrum = wavelengths, data[0, 0, :]
+        print("min:", np.min(lambdas_))
+        print("max:", np.max(lambdas_))
         show_spectrum(lambdas_, spectrum, ax=axes[0], show_background=True, short_display=True, visible=True)
 
-        # estimated
-        #        n_samples = 15
-        #        spectrum_est = np.load('Data/Nature/spectrum_est_'+ name + '.npy')
-        #        spectrum_est = np.convolve(spectrum_est, np.ones(n_samples)/n_samples, mode='same')
-
-        show_spectrum(lambdas, spectrum_est, ax=axes[1], show_background=True, short_display=True)
+        show_spectrum(lambdas_, spectrum_est, ax=axes[1], show_background=True, short_display=True, visible=True)
 
         make_dirs_safe(plt.savefig, 'Nature/Recovery_checker/' + name + '.pdf')

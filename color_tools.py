@@ -5,12 +5,15 @@ Created on Wed Jul  6 14:25:04 2016
 @author: gbaechle
 """
 
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 from scipy.interpolate import interp1d
 from scipy.optimize import nnls
-from skimage.color import rgb2xyz, xyz2rgb
-import matplotlib.pyplot as plt
+from skimage.color import rgb2xyz, xyz2rgb, rgb2hsv, hsv2rgb
+from skimage.transform import resize
+
+
 
 from spectrum import *
 
@@ -83,12 +86,12 @@ def reconstruct_spectrum_from_rgb_shifts(rgb_images, angles, wavelengths):
     
     return Spectrum3D(wavelengths, np.reshape(spectrums, [shape[0], shape[1], len(wavelengths)]))
     
-    
 
 def shift_cmf_cie(wavelengths, factor):
     
     shifted_wavelengths = wavelengths/factor    
     return read_cie_data(wavelengths=shifted_wavelengths)
+
 
 def read_cie_data(wavelengths):
     
@@ -141,7 +144,8 @@ def from_spectrum_to_xyz(wavelengths, spectral_colors, integrate_nu=True, normal
         
 #    return np.stack([x,y,z], axis=-1)
     return np.stack([X,Y,Z], axis=-1)
-    
+
+
 def from_xyz_to_spectrum(xyz_colors, wavelengths, nnls=False):
     
     orig_shape = xyz_colors.shape
@@ -173,8 +177,7 @@ def from_xyz_to_spectrum(xyz_colors, wavelengths, nnls=False):
             
             b = np.concatenate((xyz_colors[idx,:], np.zeros(len(wavelengths)) ))
             spectral_colors[idx, :] = nnls(A, b)[0]
-        
-        
+
     return spectral_colors.reshape(orig_shape[:-1] + (len(wavelengths), ))
     
     
@@ -186,7 +189,8 @@ def from_xyz_to_rgb(xyz_colors, normalize=True):
         return rgb_colors/np.max(rgb_colors)
     else:
         return rgb_colors
-    
+
+
 def from_rgb_to_xyz(rgb_colors, normalize=True):
     
     xyz_colors = rgb2xyz(rgb_colors)    
@@ -195,7 +199,12 @@ def from_rgb_to_xyz(rgb_colors, normalize=True):
         return xyz_colors/np.max(xyz_colors)
     else:
         return xyz_colors
-    
-    
 
-    
+
+def upsample_hue_saturation(original, subsampled, order):
+    small_hsv = rgb2hsv(subsampled)
+    small_hsv[:, :, 2] = 255
+    large_hsv = rgb2hsv(resize(hsv2rgb(small_hsv), original.shape, order=order))
+    large_hsv[:, :, 2] = rgb2hsv(original)[:, :, 2]
+    return hsv2rgb(large_hsv)
+

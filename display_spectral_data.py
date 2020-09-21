@@ -207,6 +207,25 @@ def select_visible(wavelengths, spectrum):
     return wavelengths, spectrum
 
 
+def load_specim_data(file_prefix, ds):
+    """Load binary data from .dat file and wavelengths from header .hdr file
+
+    :param file_prefix: file name to read, without extension
+    :param ds: down-sampling parameter (how many times to reduce image size)
+    :returns:
+        a pair of np. arrays, 2D cropped image and list of wavelengths (in meters)"""
+
+    data = np.fromfile(file_prefix + ".dat", dtype=np.float32)
+    data = np.swapaxes(data.reshape((512, -1, 512)), 1, 2)
+    downsampled = data[::ds, ::ds, :]
+
+    header_file = open(file_prefix + ".hdr", "r")
+    header = header_file.read()
+    wavelengths = np.array([float(nr[:-1]) for nr in header.split("{")[-1].split()[:-1]])
+
+    return downsampled, 1e-9 * wavelengths
+
+
 # if __name__ == '__main__':
     # path = '/Users/gbaechle/EPFL/PhD/BRDF Data and Rendering Engines/Spectrometer/2018-09-18 Wiener'
 
