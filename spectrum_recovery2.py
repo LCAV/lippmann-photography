@@ -214,9 +214,8 @@ def spectrum_recovery(omegas, signal_measured, r=-1, Z=6E-6, k0=0, infinite=True
     complex_wave = forward_model(omegas, signal_est, r, Z, k0)
     #    complex_wave = np.sign(r)*np.ones_like(signal_measured)
 
-    print("starting iterations")
+    print(f"starting {n_iter} iterations")
     for i in range(n_iter):
-        print(i)
 
         complex_wave_prev = np.copy(complex_wave)
         complex_wave = forward_model(omegas, signal_est, r, Z, k0)
@@ -226,13 +225,13 @@ def spectrum_recovery(omegas, signal_measured, r=-1, Z=6E-6, k0=0, infinite=True
             signal_est = power_spectrum_from_complex_wave(omegas, complex_wave, r, Z, k0)
             lambdas_sinc, omegas_sinc = generate_wavelengths_sinc(Z, omegas, c)
 
-            plt.figure()
+            plt.figure(figsize=(5, 5))
             plt.plot(lambdas, np.real(complex_wave_prev))
             plt.plot(lambdas, np.real(complex_wave), 'k--')
             plt.plot(lambdas, np.imag(complex_wave_prev))
             plt.plot(lambdas, np.imag(complex_wave), 'k--')
 
-            plt.figure()
+            plt.figure(figsize=(5, 5))
             plt.fill_between(lambdas, -np.sqrt(signal_measured), np.sqrt(signal_measured), alpha=0.2)
             plt.plot(lambdas, np.abs(complex_wave), 'r')
             plt.plot(lambdas, np.real(complex_wave), 'r--')
@@ -240,6 +239,7 @@ def spectrum_recovery(omegas, signal_measured, r=-1, Z=6E-6, k0=0, infinite=True
             plt.plot(lambdas, generate_matrix_F(omegas, Z) @ signal_est, 'k')
             plt.plot(lambdas_sinc, signal_est, 'k--')
             plt.title('i = ' + str(i))
+            plt.show()
 
         complex_wave *= np.sqrt(signal_measured) / np.abs(complex_wave)
 
@@ -345,7 +345,7 @@ def spectrum_recovery_data(lambdas_nu, spectrum_nu, N=200, r=0.2, visible=True, 
 
     spectrum_est, Z_est, k0_est = spectrum_recovery(omegas, spectrum, r=r, Z=Z, k0=k0, n_iter=n_iter, plot=False,
                                                     estimate_depth=False)
-    spectrum_est = np.abs(fda.apply_h(spectrum_est, Z_est, lambdas, lambdas, r=r, k0=k0_est, mode=2))
+    # spectrum_est = np.abs(fda.apply_h(spectrum_est, Z_est, lambdas, lambdas, r=r, k0=k0_est, mode=2))
 
     if Z_est == 'inf':
         Z_finite = 10E-6
@@ -354,41 +354,42 @@ def spectrum_recovery_data(lambdas_nu, spectrum_nu, N=200, r=0.2, visible=True, 
     depths = np.linspace(0, Z_finite, N)
 
     #    f, (ax1, ax2, ax3, ax4) = plt.subplots(1,4, figsize=(3.45/0.6*1.5, 3.45/4/0.6*1.5))
-    f, (ax1, ax2, ax3, ax4, ax5, ax6) = plt.subplots(1, 6, figsize=(3.45 / 0.6 * 1.5, 3.45 / 5 / 0.6 * 1.5))
+    f, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(1, 5, figsize=(3.45 / 0.6 * 1.5, 3.45 / 5 / 0.6 * 1.5))
     print(spectrum_est, Z_est)
     #    spec_lp = np.real(fda.apply_h(spectrum_est, Z_est/1.2, lambdas, lambdas, r=r, k0=k0_est, mode=2))
-    spec_lp = spectrum_est
     max_spec = np.max(spectrum)
-    filt = spec_lp / np.maximum(0.01 * max_spec, spectrum)
+    # filt = spec_lp / np.maximum(0.01 * max_spec, spectrum)
 
-    # TODO
-    w, trans, _ = dsd.read_file(
-        '2018-10-05 PhotoPlateGentet_Transmission/Transmission_10-56-02-837.txt')
-    w, trans_glass, _ = dsd.read_file(
-        '2018-10-05 PhotoPlateGentet_Transmission/Transmission_11-30-56-477_OnlyGlass.txt')
-    dyes = (trans_glass - trans) / 100
-    dyes = np.interp(lambdas, w, dyes)
+    # # TODO
+    # w, trans, _ = dsd.read_file(
+    #     '2018-10-05 PhotoPlateGentet_Transmission/Transmission_10-56-02-837.txt')
+    # w, trans_glass, _ = dsd.read_file(
+    #     '2018-10-05 PhotoPlateGentet_Transmission/Transmission_11-30-56-477_OnlyGlass.txt')
+    # dyes = (trans_glass - trans) / 100
+    # dyes = np.interp(lambdas, w, dyes)
 
-    make_dirs_safe(np.save, 'Data/filter_' + str(k0), filt)
+    # make_dirs_safe(np.save, 'Data/filter_' + str(k0), filt)
 
     show_spectrum(lambdas, spectrum, ax=ax1, show_background=True, short_display=True)
-    show_spectrum(lambdas, spec_lp, ax=ax2, show_background=True, short_display=True)
-    show_spectrum(lambdas, spec_lp / dyes, ax=ax3, show_background=True, short_display=True)
-    show_lippmann_transform(depths, lippmann_transform(lambdas, spectrum_est, depths, r=r, k0=k0_est)[0], ax=ax4,
+    show_spectrum(lambdas, spectrum_est, ax=ax2, show_background=True, short_display=True)
+    # show_spectrum(lambdas, spectrum_est / dyes, ax=ax3, show_background=True, short_display=True)
+    show_lippmann_transform(depths, lippmann_transform(lambdas, np.copy(spectrum_est), depths, r=r, k0=k0_est)[0],
+                                                       ax=ax4,
                             short_display=True)
-    show_spectrum(lambdas, np.abs(fda.apply_h(spectrum_est, Z_est, lambdas, lambdas, r=r, k0=k0_est, mode=1)) ** 2,
+    show_spectrum(lambdas, np.abs(fda.apply_h(np.copy(spectrum_est), Z_est, lambdas, lambdas, r=r, k0=k0_est,
+                                              mode=1)) ** 2,
                   ax=ax5, short_display=True, show_background=True)
-    show_spectrum(lambdas, filt, ax=ax6, short_display=True, show_background=True)
+    # show_spectrum(lambdas, filt, ax=ax6, short_display=True, show_background=True)
     ax1.set_title('(a) Measured spectrum')
     ax2.set_title('(b) Estimated spectrum')
-    ax3.set_title('(c) Corrected spectrum')
+    # ax3.set_title('(c) Corrected spectrum')
     ax4.set_title('(d) Estimated silver density')
     ax5.set_title('(e) Estimated replayed spectrum')
-    ax6.set_title('(f) Filter')
+    # ax6.set_title('(f) Filter')
 
     make_dirs_safe(plt.savefig, fig_path + 'spectrum_recovery.pdf')
 
-    return spectrum_est, Z_est, k0_est, spec_lp
+    return spectrum_est, Z_est, k0_est, spectrum_est
 
 
 if __name__ == '__main__':
@@ -399,8 +400,8 @@ if __name__ == '__main__':
     Z = 5E-6
     k0 = 1
     r = 0.7 * np.exp(1j * np.deg2rad(148))
-    n_iter = 400
-    visible = True
+    n_iter = 300
+    visible = False
 
     path = 'Cubes/'
 
@@ -411,23 +412,35 @@ if __name__ == '__main__':
         name = file.split('/')[-1][:-4]
         print("processing file", name)
 
-        data, wavelengths = dsd.load_specim_data(path+name, ds=25)
-        # spectrum_est, Z_est, k0_est = spectrum_recovery_spectrometer(path, name + ".txt", N=200, r=r, visible=True,
-        #                                                              normalize=False, n_iter=n_iter)
+        data, wavelengths = dsd.load_specim_data(path + name, ds=25)
+
+        data = data[1:-1, 1:-1, :]
+
+        inverted = np.zeros_like(data)
 
         start = time.time()
-        spectrum_est, Z_est, k0_est, spec_lp = spectrum_recovery_data(wavelengths, data[0, 0, :], N=len(wavelengths), r=r,
-                                                                      visible=visible,
-                                                                      Z=30E-6, n_iter=n_iter)
+        for x in range(data.shape[0]):
+            for y in range(data.shape[1]):
+                print(f"processing ({x}, {y})")
+                spectrum_est, Z_est, k0_est, spec_lp = \
+                    spectrum_recovery_data(wavelengths,
+                                           data[x, y, :],
+                                           N=len(wavelengths),
+                                           r=r,
+                                           visible=visible,
+                                           Z=30E-6,
+                                           n_iter=n_iter)
+                inverted[x, y, :] = spectrum_est
         print(f"Time elapsed: {time.time() - start}")
-        f, axes = plt.subplots(1, 2, figsize=(3.45 / 0.5, 3.45), sharex='col')
+        # f, axes = plt.subplots(1, 2, figsize=(3.45 / 0.5, 3.45), sharex='col')
+        #
+        # # original
+        # lambdas_, spectrum = wavelengths, data[0, 0, :]
+        # print("min:", np.min(lambdas_))
+        # print("max:", np.max(lambdas_))
+        # show_spectrum(lambdas_, spectrum, ax=axes[0], show_background=True, short_display=True, visible=True)
+        #
+        # show_spectrum(lambdas_, spectrum_est, ax=axes[1], show_background=True, short_display=True, visible=True)
+        np.save(path + name + "_test2", inverted)
 
-        # original
-        lambdas_, spectrum = wavelengths, data[0, 0, :]
-        print("min:", np.min(lambdas_))
-        print("max:", np.max(lambdas_))
-        show_spectrum(lambdas_, spectrum, ax=axes[0], show_background=True, short_display=True, visible=True)
-
-        show_spectrum(lambdas_, spectrum_est, ax=axes[1], show_background=True, short_display=True, visible=True)
-
-        make_dirs_safe(plt.savefig, 'Nature/Recovery_checker/' + name + '.pdf')
+        # make_dirs_safe(plt.savefig, 'Nature/Recovery_checker/' + name + '.pdf')
