@@ -354,10 +354,10 @@ def spectrum_recovery_data(lambdas_nu, spectrum_nu, N=200, r=0.2, visible=True, 
     depths = np.linspace(0, Z_finite, N)
 
     #    f, (ax1, ax2, ax3, ax4) = plt.subplots(1,4, figsize=(3.45/0.6*1.5, 3.45/4/0.6*1.5))
-    f, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(1, 5, figsize=(3.45 / 0.6 * 1.5, 3.45 / 5 / 0.6 * 1.5))
+    # f, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(1, 5, figsize=(3.45 / 0.6 * 1.5, 3.45 / 5 / 0.6 * 1.5))
     print(spectrum_est, Z_est)
     #    spec_lp = np.real(fda.apply_h(spectrum_est, Z_est/1.2, lambdas, lambdas, r=r, k0=k0_est, mode=2))
-    max_spec = np.max(spectrum)
+    # max_spec = np.max(spectrum)
     # filt = spec_lp / np.maximum(0.01 * max_spec, spectrum)
 
     # # TODO
@@ -370,24 +370,24 @@ def spectrum_recovery_data(lambdas_nu, spectrum_nu, N=200, r=0.2, visible=True, 
 
     # make_dirs_safe(np.save, 'Data/filter_' + str(k0), filt)
 
-    show_spectrum(lambdas, spectrum, ax=ax1, show_background=True, short_display=True)
-    show_spectrum(lambdas, spectrum_est, ax=ax2, show_background=True, short_display=True)
-    # show_spectrum(lambdas, spectrum_est / dyes, ax=ax3, show_background=True, short_display=True)
-    show_lippmann_transform(depths, lippmann_transform(lambdas, np.copy(spectrum_est), depths, r=r, k0=k0_est)[0],
-                                                       ax=ax4,
-                            short_display=True)
-    show_spectrum(lambdas, np.abs(fda.apply_h(np.copy(spectrum_est), Z_est, lambdas, lambdas, r=r, k0=k0_est,
-                                              mode=1)) ** 2,
-                  ax=ax5, short_display=True, show_background=True)
-    # show_spectrum(lambdas, filt, ax=ax6, short_display=True, show_background=True)
-    ax1.set_title('(a) Measured spectrum')
-    ax2.set_title('(b) Estimated spectrum')
-    # ax3.set_title('(c) Corrected spectrum')
-    ax4.set_title('(d) Estimated silver density')
-    ax5.set_title('(e) Estimated replayed spectrum')
+    # show_spectrum(lambdas, spectrum, ax=ax1, show_background=True, short_display=True)
+    # show_spectrum(lambdas, spectrum_est, ax=ax2, show_background=True, short_display=True)
+    # # show_spectrum(lambdas, spectrum_est / dyes, ax=ax3, show_background=True, short_display=True)
+    # show_lippmann_transform(depths, lippmann_transform(lambdas, np.copy(spectrum_est), depths, r=r, k0=k0_est)[0],
+    #                                                    ax=ax4,
+    #                         short_display=True)
+    # show_spectrum(lambdas, np.abs(fda.apply_h(np.copy(spectrum_est), Z_est, lambdas, lambdas, r=r, k0=k0_est,
+    #                                           mode=1)) ** 2,
+    #               ax=ax5, short_display=True, show_background=True)
+    # # show_spectrum(lambdas, filt, ax=ax6, short_display=True, show_background=True)
+    # ax1.set_title('(a) Measured spectrum')
+    # ax2.set_title('(b) Estimated spectrum')
+    # # ax3.set_title('(c) Corrected spectrum')
+    # ax4.set_title('(d) Estimated silver density')
+    # ax5.set_title('(e) Estimated replayed spectrum')
     # ax6.set_title('(f) Filter')
 
-    make_dirs_safe(plt.savefig, fig_path + 'spectrum_recovery.pdf')
+    # make_dirs_safe(plt.savefig, fig_path + 'spectrum_recovery.pdf')
 
     return spectrum_est, Z_est, k0_est, spectrum_est
 
@@ -441,6 +441,6 @@ if __name__ == '__main__':
         # show_spectrum(lambdas_, spectrum, ax=axes[0], show_background=True, short_display=True, visible=True)
         #
         # show_spectrum(lambdas_, spectrum_est, ax=axes[1], show_background=True, short_display=True, visible=True)
-        np.save(path + name + "_test2", inverted)
+        np.save(path + name, inverted)
 
         # make_dirs_safe(plt.savefig, 'Nature/Recovery_checker/' + name + '.pdf')
