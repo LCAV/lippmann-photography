@@ -5,11 +5,19 @@ Created on Fri Jun 22 08:03:24 2018
 
 @author: gbaechle
 """
+import os
+os.environ["OMP_NUM_THREADS"] = "12"
+os.environ["MKL_NUM_THREADS"] = "12"
+os.environ["OPENBLAS_NUM_THREADS"] = "12"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "12"
+os.environ["NUMEXPR_NUM_THREADS"] = "12"
+
 
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button, RadioButtons
 import pandas as pd
 import glob
+from multiprocessing import Pool
 
 from scipy.optimize import minimize_scalar, fmin, fmin_powell, nnls
 from scipy.signal import hilbert
@@ -355,7 +363,7 @@ def spectrum_recovery_data(lambdas_nu, spectrum_nu, N=200, r=0.2, visible=True, 
 
     #    f, (ax1, ax2, ax3, ax4) = plt.subplots(1,4, figsize=(3.45/0.6*1.5, 3.45/4/0.6*1.5))
     # f, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(1, 5, figsize=(3.45 / 0.6 * 1.5, 3.45 / 5 / 0.6 * 1.5))
-    print(spectrum_est, Z_est)
+    # print(spectrum_est, Z_est)
     #    spec_lp = np.real(fda.apply_h(spectrum_est, Z_est/1.2, lambdas, lambdas, r=r, k0=k0_est, mode=2))
     # max_spec = np.max(spectrum)
     # filt = spec_lp / np.maximum(0.01 * max_spec, spectrum)
@@ -408,7 +416,7 @@ if __name__ == '__main__':
     omegas = np.linspace(2 * np.pi * c / 400E-9, 2 * np.pi * c / 700E-9, N)
     lambdas = 2 * np.pi * c / omegas
 
-    for i, file in enumerate(glob.glob(path + '/*.dat')):
+    def run_inverse_per_file(file):
         name = file.split('/')[-1][:-4]
         print("processing file", name)
 
@@ -421,6 +429,7 @@ if __name__ == '__main__':
         start = time.time()
         for x in range(data.shape[0]):
             for y in range(data.shape[1]):
+                pixel_time = time.time()
                 print(f"processing ({x}, {y})")
                 spectrum_est, Z_est, k0_est, spec_lp = \
                     spectrum_recovery_data(wavelengths,
@@ -431,6 +440,7 @@ if __name__ == '__main__':
                                            Z=30E-6,
                                            n_iter=n_iter)
                 inverted[x, y, :] = spectrum_est
+                print(f"Pixel time: {time.time() - pixel_time}")
         print(f"Time elapsed: {time.time() - start}")
         # f, axes = plt.subplots(1, 2, figsize=(3.45 / 0.5, 3.45), sharex='col')
         #
@@ -444,3 +454,6 @@ if __name__ == '__main__':
         np.save(path + name, inverted)
 
         # make_dirs_safe(plt.savefig, 'Nature/Recovery_checker/' + name + '.pdf')
+
+    pool = Pool(2)
+    pool.map(run_inverse_per_file, glob.glob(path + '/*.dat'))
