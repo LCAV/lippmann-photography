@@ -207,16 +207,22 @@ def select_visible(wavelengths, spectrum):
     return wavelengths, spectrum
 
 
-def load_specim_data(file_prefix, ds):
+def load_specim_data(file_prefix, ds, cut=False):
     """Load binary data from .dat file and wavelengths from header .hdr file
 
     :param file_prefix: file name to read, without extension
     :param ds: down-sampling parameter (how many times to reduce image size)
+    :param cut: if True, use data from file_prefix_cut.txt to cut edges of the image
     :returns:
         a pair of np. arrays, 2D cropped image and list of wavelengths (in meters)"""
 
     data = np.fromfile(file_prefix + ".dat", dtype=np.float32)
     data = np.swapaxes(data.reshape((512, -1, 512)), 1, 2)
+    if cut:
+        cut_idx = np.loadtxt(file_prefix + "_cut.txt").astype(np.int)
+        print(cut_idx)
+        print(cut_idx[0, 0])
+        data = data[cut_idx[0, 0]:cut_idx[0, 1], cut_idx[1, 0]:cut_idx[1, 1]]
     downsampled = data[::ds, ::ds, :]
 
     header_file = open(file_prefix + ".hdr", "r")
