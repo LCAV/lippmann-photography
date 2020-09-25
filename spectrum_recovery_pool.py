@@ -197,12 +197,11 @@ def forward_model(omegas, spectrum, r, Z, k0):
     return B @ spectrum
 
 
-def spectrum_recovery(omegas, signal_measured, r=-1, Z=6E-6, k0=0, infinite=True, n_iter=200, plot=False,
+def spectrum_recovery(omegas, signal_measured, r=-1, Z=6E-6, k0=0, n_iter=200,
                       estimate_depth=True):
     """Used in spectrum_recovery_data"""
 
     lambdas = 2 * np.pi * c / omegas
-    signal_est = None
 
     if estimate_depth:
         k0 = 3.
@@ -215,35 +214,11 @@ def spectrum_recovery(omegas, signal_measured, r=-1, Z=6E-6, k0=0, infinite=True
 
     F = generate_matrix_F(omegas, Z)
     signal_est = np.ones(F.shape[1])
-    complex_wave = forward_model(omegas, signal_est, r, Z, k0)
 
     print(f"starting {n_iter} iterations")
     for i in range(n_iter):
 
-        complex_wave_prev = np.copy(complex_wave)
         complex_wave = forward_model(omegas, signal_est, r, Z, k0)
-        #        complex_wave = project_onto_subspace(omegas, complex_wave, r, Z, k0)
-
-        if plot and np.mod(i, n_iter // 20) == 0:
-            signal_est = power_spectrum_from_complex_wave(omegas, complex_wave, r, Z, k0)
-            lambdas_sinc, omegas_sinc = generate_wavelengths_sinc(Z, omegas, c)
-
-            plt.figure(figsize=(5, 5))
-            plt.plot(lambdas, np.real(complex_wave_prev))
-            plt.plot(lambdas, np.real(complex_wave), 'k--')
-            plt.plot(lambdas, np.imag(complex_wave_prev))
-            plt.plot(lambdas, np.imag(complex_wave), 'k--')
-
-            plt.figure(figsize=(5, 5))
-            plt.fill_between(lambdas, -np.sqrt(signal_measured), np.sqrt(signal_measured), alpha=0.2)
-            plt.plot(lambdas, np.abs(complex_wave), 'r')
-            plt.plot(lambdas, np.real(complex_wave), 'r--')
-            plt.plot(lambdas, np.imag(complex_wave), 'r:')
-            plt.plot(lambdas, generate_matrix_F(omegas, Z) @ signal_est, 'k')
-            plt.plot(lambdas_sinc, signal_est, 'k--')
-            plt.title('i = ' + str(i))
-            plt.show()
-
         complex_wave *= np.sqrt(signal_measured) / np.abs(complex_wave)
 
         if estimate_depth:
@@ -251,8 +226,7 @@ def spectrum_recovery(omegas, signal_measured, r=-1, Z=6E-6, k0=0, infinite=True
 
         signal_est = power_spectrum_from_complex_wave(omegas, complex_wave, r, Z, k0)
 
-    #    return fda.sinc_interp(power_spectrum_from_complex_wave(omegas, complex_wave, r, Z, k0), omegas_sinc, omegas)
-    return generate_matrix_F(omegas, Z) @ power_spectrum_from_complex_wave(omegas, complex_wave, r, Z, k0), Z, k0
+    return generate_matrix_F(omegas, Z) @ signal_est, Z, k0
 
 
 def estimate_Z(lambdas, signal):
@@ -294,7 +268,7 @@ def refine_Z_tau(i, lambdas, complex_wave, signal_measured, Z, r, k0, lb=0):
         errors = [errortau(tau) for tau in taus]
         k0 = taus[np.argmin(errors)]
 
-        print(Z, k0)
+        # print(Z, k0)
     elif np.mod(i, 5) == 0:
 
         error = lambda x: np.sum((np.abs(f(x)) - np.sqrt(signal_measured)) ** 2)
@@ -302,7 +276,7 @@ def refine_Z_tau(i, lambdas, complex_wave, signal_measured, Z, r, k0, lb=0):
         Z, k0 = np.abs(xopt[0]), np.maximum(0, xopt[1])
         #        Z = xopt[0]
 
-        print(Z, k0)
+        # print(Z, k0)
 
     return Z, k0
 
@@ -333,7 +307,8 @@ def spectrum_recovery_spectrometer(path, file, N=200, r='hg', visible=True, norm
     return spectrum_est, Z_est, k0_est
 
 
-def spectrum_recovery_data(lambdas_nu, spectrum_nu, N=200, r=0.2, visible=True, Z=8E-6, n_iter=200):
+def spectrum_recovery_data(lambdas_nu, spectrum_nu, N=200, r=0.2, visible=True, Z=8E-6, n_iter=200,
+                           estimate_depth=False):
     """ Used in the main script"""
     k0 = 4.5
 
@@ -347,8 +322,8 @@ def spectrum_recovery_data(lambdas_nu, spectrum_nu, N=200, r=0.2, visible=True, 
 
     spectrum = np.maximum(0, spectrum)
 
-    spectrum_est, Z_est, k0_est = spectrum_recovery(omegas, spectrum, r=r, Z=Z, k0=k0, n_iter=n_iter, plot=False,
-                                                    estimate_depth=False)
+    spectrum_est, Z_est, k0_est = spectrum_recovery(omegas, spectrum, r=r, Z=Z, k0=k0, n_iter=n_iter,
+                                                    estimate_depth=estimate_depth)
 
     return spectrum_est, Z_est, k0_est, spectrum_est
 
@@ -362,7 +337,10 @@ if __name__ == '__main__':
               "k0": 1,
               "r":  0.7 * np.exp(1j * np.deg2rad(148)),
               "n_iter": 200,
-              "visible": True}
+              "visible": True,
+              "downsampling": 50,
+              "estimate_depth": True,
+              "c": c}
 
     directory = 'Cubes/'
 
@@ -371,12 +349,13 @@ if __name__ == '__main__':
         print("\n")
         print("processing file", name)
 
-        data, wavelengths = dsd.load_specim_data(directory + name, ds=25, cut=True)
+        data, wavelengths = dsd.load_specim_data(directory + name, ds=params["downsampling"], cut=True)
 
         start = time.time()
 
         def spectrum_recovery_row(x):
             inverted_row = np.zeros((data.shape[1], params["N"]))
+            Z_row = np.zeros((data.shape[1]))
             row_time = time.time()
             for y in range(data.shape[1]):
                 pixel_time = time.time()
@@ -388,15 +367,19 @@ if __name__ == '__main__':
                                            r=params["r"],
                                            visible=params["visible"],
                                            Z=params["Z"],
-                                           n_iter=params["n_iter"])
+                                           n_iter=params["n_iter"],
+                                           estimate_depth=params["estimate_depth"])
                 inverted_row[y, :] = spectrum_est
+                Z_row[y] = Z_est
                 print(f"Pixel time: {time.time() - pixel_time}")
             print(f"Row time: {time.time() - row_time}")
-            return inverted_row
+            return inverted_row, Z_row
 
         pool = Pool(2)
-        inverted = np.array(pool.map(spectrum_recovery_row, range(data.shape[0])))
-
+        inverted, Z_estimates = zip(*pool.map(spectrum_recovery_row, range(data.shape[0])))
+        inverted = np.array(inverted)
+        if params["estimate_depth"]:
+            params["Z_estimates"] = np.array(Z_estimates)
         print(f"Time elapsed: {time.time() - start}")
 
         i = 0
