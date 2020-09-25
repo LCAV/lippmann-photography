@@ -220,8 +220,6 @@ def load_specim_data(file_prefix, ds, cut=False):
     data = np.swapaxes(data.reshape((512, -1, 512)), 1, 2)
     if cut:
         cut_idx = np.loadtxt(file_prefix + "_cut.txt").astype(np.int)
-        print(cut_idx)
-        print(cut_idx[0, 0])
         data = data[cut_idx[0, 0]:cut_idx[0, 1], cut_idx[1, 0]:cut_idx[1, 1]]
     downsampled = data[::ds, ::ds, :]
 
