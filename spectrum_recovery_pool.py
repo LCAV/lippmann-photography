@@ -29,6 +29,7 @@ c = c0 / n0
 
 
 def generate_matrix_F(omegas, Z, margin=0.5):
+    """Create up-samping matrix, from size defined by Z to length of omegas"""
     omegas_sinc = generate_wavelengths_sinc(Z, omegas, c, margin=margin)[1]
 
     mi = np.min(omegas)
@@ -53,6 +54,7 @@ def generate_matrix_F(omegas, Z, margin=0.5):
 
 
 def generate_matrix_A(omegas, Z, r=-1, mode=1, k0=0, over_samples=0):
+    """Generate matrix that maps power spectrum to reflected complex wave"""
     lambdas = 2 * np.pi * c / omegas
 
     mi = np.min(omegas)
@@ -164,6 +166,7 @@ def generate_wavelengths_sinc(Z, omegas, c=c, margin=0):
 
 
 def power_spectrum_from_complex_wave(omegas, replay, r, Z, k0):
+    """Solve (if possible non negative) least squares to find a spectrum...? """
     F = generate_matrix_F(omegas, Z)
     A = generate_matrix_A(omegas, Z, r=r, k0=k0)
 
@@ -191,6 +194,7 @@ def project_onto_subspace(omegas, spectrum, r, Z, k0):
 
 
 def forward_model(omegas, spectrum, r, Z, k0):
+    """Calculate complex reflected wave given (power) spectrum """
     F = generate_matrix_F(omegas, Z)
     A = generate_matrix_A(omegas, Z, r=r, k0=k0)
     B = A @ F
@@ -329,10 +333,13 @@ def spectrum_recovery_data(lambdas_nu, spectrum_nu, N=200, r=0.2, visible=True, 
 
 
 if __name__ == '__main__':
+    """reflective index r = ρeexp(jθ).
+     For an interface between glass and mercury ρ = 0.71 and θ = −148 
+     for an interface between glass and air ρ = 0.2 and θ = 0."""
 
     plt.close('all')
 
-    params = {"N": 100,
+    params = {"N": 200,
               "Z": 5E-6,
               "k0": 1,
               "r":  0.7 * np.exp(1j * np.deg2rad(148)),
