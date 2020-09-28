@@ -14,8 +14,10 @@ os.environ["NUMEXPR_NUM_THREADS"] = "4"
 
 import glob
 from multiprocessing import Pool
+import numpy as np
 import pickle
 from scipy.optimize import fmin, nnls
+import scipy as sp
 import time
 
 
@@ -93,55 +95,6 @@ def generate_matrix_A(omegas, Z, r=-1, mode=1, k0=0, over_samples=0):
     return 4 / np.pi * np.abs(omegas[1] - omegas[0]) / c * A_cropped
 
 
-def generate_matrix_B(omegas, Z, r=-1, mode=1, k0=0, margin=0.5):
-    lambdas = 2 * np.pi * c / omegas
-    lambdas_sinc, omegas_sinc = generate_wavelengths_sinc(Z, omegas, c, margin=margin)
-
-    mi = np.min(omegas)
-    ma = np.max(omegas)
-
-    B = np.zeros((len(lambdas), len(lambdas_sinc)), dtype=complex)
-    B_edges = np.zeros((len(lambdas), len(lambdas_sinc)), dtype=complex)
-    for i, lambda_prime in enumerate(lambdas):
-        B[i, :] = fda.h(lambdas_sinc, lambda_prime, Z, r=r, mode=1, k0=k0)
-        B_edges[i, :] = fda.h(lambdas_sinc, lambda_prime, Z, r=r, mode=2, k0=k0)
-
-    B *= 4 / np.pi * np.abs(omegas_sinc[1] - omegas_sinc[0]) / c
-    B_edges *= 4 / np.pi * np.abs(omegas_sinc[1] - omegas_sinc[0]) / c
-
-    if margin <= 0:
-        return B
-
-    e_idx = np.where(omegas_sinc < mi)[0]
-    b_idx = np.where(omegas_sinc > ma)[0]
-
-    B_cropped = B[:, np.max(b_idx) + 1: np.min(e_idx)]
-    B_cropped[:, 0] += np.sum(B_edges[:, b_idx], axis=1)
-    B_cropped[:, -1] += np.sum(B_edges[:, e_idx], axis=1)
-
-    return B_cropped
-
-
-def generate_matrix_B_(omegas, Z, r=-1, mode=1, k0=0):
-    lambdas = 2 * np.pi * c / omegas
-    lambdas_sinc, omegas_sinc = generate_wavelengths_sinc(Z, omegas, c)
-    #    lambdas_sinc, omegas_sinc = lambdas, omegas
-
-    B = np.zeros((len(lambdas), len(lambdas_sinc)), dtype=complex)
-    for i, lambda_prime in enumerate(lambdas):
-        for j, lambda_sinc in enumerate(lambdas_sinc):
-            om_max = 2 * np.pi * c / 250E-9
-            om = np.linspace(om_max, 0, 1000)
-            lam = 2 * np.pi * c / om
-
-            omega_sinc = 2 * np.pi * c / lambda_sinc
-            T = np.abs(omegas_sinc[1] - omegas_sinc[0])
-            sinc = np.sinc((om - omega_sinc) / T)
-            B[i, j] = -np.trapz(sinc * fda.h(lam, lambda_prime, Z, r=r, mode=mode, k0=k0), om)
-
-    return B
-
-
 def generate_wavelengths_sinc(Z, omegas, c=c, margin=0):
     if Z == 'inf' or Z == 'infinite':
         Z = 100E-6  # default behavior to avoid problems
@@ -187,7 +140,6 @@ def project_onto_subspace(omegas, spectrum, r, Z, k0):
     F = generate_matrix_F(omegas, Z)
     A = generate_matrix_A(omegas, Z, r=r, k0=k0)
     Bc = A @ F
-    #    Bc = generate_matrix_B(omegas, Z, r=r, k0=k0)
     B = np.r_[np.real(Bc), np.imag(Bc)]
 
     return Bc @ nnls(B, np.r_[np.real(replay), np.imag(replay)])[0]
@@ -208,29 +160,27 @@ def spectrum_recovery(omegas, signal_measured, r=-1, Z=6E-6, k0=0, n_iter=200,
     lambdas = 2 * np.pi * c / omegas
 
     if estimate_depth:
-        k0 = 3.
         Z = estimate_Z(lambdas, signal_measured)
-    #        Z = 17.2066E-6
-    #        Z = 9.6E-6
 
     Z_lb = Z
-    print(Z, k0)
-
     F = generate_matrix_F(omegas, Z)
     signal_est = np.ones(F.shape[1])
+    signal_measured_sqrt = np.sqrt(signal_measured)
 
     print(f"starting {n_iter} iterations")
     for i in range(n_iter):
 
+        previous_est = np.copy(signal_est)
         complex_wave = forward_model(omegas, signal_est, r, Z, k0)
-        complex_wave *= np.sqrt(signal_measured) / np.abs(complex_wave)
+        error = np.linalg.norm(signal_measured_sqrt - np.abs(complex_wave))/np.linalg.norm(signal_measured_sqrt)
+        complex_wave *= signal_measured_sqrt / np.abs(complex_wave)
 
         if estimate_depth:
-            Z2, k0 = refine_Z_tau(i, lambdas, complex_wave, signal_measured, Z, r, k0, lb=Z_lb)
+            Z, k0 = refine_Z_tau(i, lambdas, complex_wave, signal_measured, Z, r, k0, lb=Z_lb)
 
         signal_est = power_spectrum_from_complex_wave(omegas, complex_wave, r, Z, k0)
 
-    return generate_matrix_F(omegas, Z) @ signal_est, Z, k0
+    return generate_matrix_F(omegas, Z) @ signal_est, Z, k0, error
 
 
 def estimate_Z(lambdas, signal):
@@ -285,32 +235,6 @@ def refine_Z_tau(i, lambdas, complex_wave, signal_measured, Z, r, k0, lb=0):
     return Z, k0
 
 
-def spectrum_recovery_spectrometer(path, file, N=200, r='hg', visible=True, normalize=True, n_iter=200):
-    if r == 'hg':
-        r = 0.7 * np.exp(1j * np.deg2rad(148))
-
-    wavelengths, data, i_time = dsd.read_file(path + file)
-
-    if normalize:
-        white_path = path + 'Bright frame ' + str(int(i_time)) + '.txt'
-        black_path = path + 'Dark frame ' + str(int(i_time)) + '.txt'
-        data_norm = dsd.normalize_data(wavelengths, data, i_time, white_path, black_path)
-    else:
-        data_norm = data
-    data_norm = np.nan_to_num(data_norm)
-    data_norm = np.maximum(0, data_norm)
-
-    spectrum_est, Z_est, k0_est, spec_lp = spectrum_recovery_data(wavelengths, data_norm, N=N, r=r, visible=visible,
-                                                                  Z=30E-6, n_iter=n_iter)
-
-    make_dirs_safe(np.save, 'Data/Nature/lambdas', wavelengths)
-    np.save('Data/Nature/spectrum_est_' + file[:-4], spec_lp)
-    np.save('Data/Nature/Z_est_' + file[:-4], Z_est)
-    np.save('Data/Nature/k0_est_' + file[:-4], k0_est)
-
-    return spectrum_est, Z_est, k0_est
-
-
 def spectrum_recovery_data(lambdas_nu, spectrum_nu, N=200, r=0.2, visible=True, Z=8E-6, n_iter=200,
                            estimate_depth=False):
     """ Used in the main script"""
@@ -323,13 +247,12 @@ def spectrum_recovery_data(lambdas_nu, spectrum_nu, N=200, r=0.2, visible=True, 
         omegas = np.linspace(np.max(omegas_nu), np.min(omegas_nu), N)
     spectrum = sp.interpolate.interp1d(omegas_nu, spectrum_nu, kind='cubic', bounds_error=False,
                                        fill_value='extrapolate')(omegas)
-
     spectrum = np.maximum(0, spectrum)
 
-    spectrum_est, Z_est, k0_est = spectrum_recovery(omegas, spectrum, r=r, Z=Z, k0=k0, n_iter=n_iter,
-                                                    estimate_depth=estimate_depth)
+    spectrum_est, Z_est, k0_est, error = spectrum_recovery(omegas, spectrum, r=r, Z=Z, k0=k0, n_iter=n_iter,
+                                                           estimate_depth=estimate_depth)
 
-    return spectrum_est, Z_est, k0_est, spectrum_est
+    return spectrum_est, Z_est, k0_est, spectrum_est, error
 
 
 if __name__ == '__main__':
@@ -341,11 +264,11 @@ if __name__ == '__main__':
 
     params = {"N": 200,
               "Z": 5E-6,
-              "k0": 1,
+              "k0": 3.7,
               "r":  0.7 * np.exp(1j * np.deg2rad(148)),
-              "n_iter": 200,
+              "n_iter": 500,
               "visible": True,
-              "downsampling": 50,
+              "downsampling": 300,
               "estimate_depth": True,
               "c": c}
 
@@ -363,11 +286,13 @@ if __name__ == '__main__':
         def spectrum_recovery_row(x):
             inverted_row = np.zeros((data.shape[1], params["N"]))
             Z_row = np.zeros((data.shape[1]))
+            k0_row = np.zeros((data.shape[1]))
+            e_row = np.zeros((data.shape[1]))
             row_time = time.time()
             for y in range(data.shape[1]):
                 pixel_time = time.time()
                 print(f"processing ({x}, {y})")
-                spectrum_est, Z_est, k0_est, spec_lp = \
+                spectrum_est, Z_est, k0_est, spec_lp, error = \
                     spectrum_recovery_data(wavelengths,
                                            data[x, y, :],
                                            N=params["N"],
@@ -378,15 +303,20 @@ if __name__ == '__main__':
                                            estimate_depth=params["estimate_depth"])
                 inverted_row[y, :] = spectrum_est
                 Z_row[y] = Z_est
+                k0_row[y] = k0_est
+                e_row[y] = error
                 print(f"Pixel time: {time.time() - pixel_time}")
             print(f"Row time: {time.time() - row_time}")
-            return inverted_row, Z_row
+            return inverted_row, Z_row, k0_row
 
-        pool = Pool(2)
-        inverted, Z_estimates = zip(*pool.map(spectrum_recovery_row, range(data.shape[0])))
+
+        pool = Pool(6)
+        inverted, Z_estimates, k0_estimates, errors = zip(*pool.map(spectrum_recovery_row, range(data.shape[0])))
         inverted = np.array(inverted)
+        params["errors"] = np.array(errors)
         if params["estimate_depth"]:
             params["Z_estimates"] = np.array(Z_estimates)
+            params["k0_estimates"] = np.array(k0_estimates)
         print(f"Time elapsed: {time.time() - start}")
 
         i = 0
@@ -398,6 +328,6 @@ if __name__ == '__main__':
             dirname = f"PNAS/{i}/"
         os.mkdir(f"PNAS/{i}")
         np.save(dirname + name, inverted)
-        with open( dirname + name + ".pkl", 'wb') as handle:
+        with open(dirname + name + ".pkl", 'wb') as handle:
             pickle.dump(params, handle)
 
