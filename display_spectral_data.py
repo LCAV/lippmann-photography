@@ -11,7 +11,7 @@ from scipy import misc
 import matplotlib.pyplot as plt
 
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile, join, exists
 
 import warnings
 
@@ -219,8 +219,12 @@ def load_specim_data(file_prefix, ds, cut=False):
     data = np.fromfile(file_prefix + ".dat", dtype=np.float32)
     data = np.swapaxes(data.reshape((512, -1, 512)), 1, 2)
     if cut:
-        cut_idx = np.loadtxt(file_prefix + "_cut.txt").astype(np.int)
-        data = data[cut_idx[0, 0]:cut_idx[0, 1], cut_idx[1, 0]:cut_idx[1, 1]]
+        cut_file_path = file_prefix + "_cut.txt"
+        if exists(cut_file_path):
+            cut_idx = np.loadtxt(file_prefix + "_cut.txt").astype(np.int)
+            data = data[cut_idx[0, 0]:cut_idx[0, 1], cut_idx[1, 0]:cut_idx[1, 1]]
+        else:
+            print("The file specifying the crop does not exist for this data")
     downsampled = data[::ds, ::ds, :]
 
     header_file = open(file_prefix + ".hdr", "r")

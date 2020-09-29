@@ -307,10 +307,10 @@ if __name__ == '__main__':
                 e_row[y] = error
                 print(f"Pixel time: {time.time() - pixel_time}")
             print(f"Row time: {time.time() - row_time}")
-            return inverted_row, Z_row, k0_row
+            return inverted_row, Z_row, k0_row, e_row
 
 
-        pool = Pool(6)
+        pool = Pool(1)
         inverted, Z_estimates, k0_estimates, errors = zip(*pool.map(spectrum_recovery_row, range(data.shape[0])))
         inverted = np.array(inverted)
         params["errors"] = np.array(errors)
