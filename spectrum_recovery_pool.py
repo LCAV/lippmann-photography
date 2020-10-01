@@ -14,6 +14,7 @@ os.environ["NUMEXPR_NUM_THREADS"] = "4"
 
 import glob
 from multiprocessing import Pool
+# import jax.numpy as np
 import numpy as np
 import pickle
 from scipy.optimize import fmin, nnls
@@ -136,15 +137,6 @@ def power_spectrum_from_complex_wave(omegas, replay, r, Z, k0):
     return spectrum
 
 
-def project_onto_subspace(omegas, spectrum, r, Z, k0):
-    F = generate_matrix_F(omegas, Z)
-    A = generate_matrix_A(omegas, Z, r=r, k0=k0)
-    Bc = A @ F
-    B = np.r_[np.real(Bc), np.imag(Bc)]
-
-    return Bc @ nnls(B, np.r_[np.real(replay), np.imag(replay)])[0]
-
-
 def forward_model(omegas, spectrum, r, Z, k0):
     """Calculate complex reflected wave given (power) spectrum """
     F = generate_matrix_F(omegas, Z)
@@ -154,7 +146,7 @@ def forward_model(omegas, spectrum, r, Z, k0):
 
 
 def spectrum_recovery(omegas, signal_measured, r=-1, Z=6E-6, k0=0, n_iter=200,
-                      estimate_depth=True):
+                      estimate_depth=True, previous_spectrum=None, stop_error=None):
     """Used in spectrum_recovery_data"""
 
     lambdas = 2 * np.pi * c / omegas
@@ -165,22 +157,32 @@ def spectrum_recovery(omegas, signal_measured, r=-1, Z=6E-6, k0=0, n_iter=200,
     Z_lb = Z
     F = generate_matrix_F(omegas, Z)
     signal_est = np.ones(F.shape[1])
+    if previous_spectrum is not None:
+        if signal_est.shape == previous_spectrum.shape:
+            signal_est = previous_spectrum
     signal_measured_sqrt = np.sqrt(signal_measured)
+    error = np.inf
 
     print(f"starting {n_iter} iterations")
     for i in range(n_iter):
 
-        previous_est = np.copy(signal_est)
         complex_wave = forward_model(omegas, signal_est, r, Z, k0)
         error = np.linalg.norm(signal_measured_sqrt - np.abs(complex_wave))/np.linalg.norm(signal_measured_sqrt)
+        if stop_error is not None:
+            if stop_error > error:
+                print(f"reached error {error}")
+                break
         complex_wave *= signal_measured_sqrt / np.abs(complex_wave)
 
         if estimate_depth:
             Z, k0 = refine_Z_tau(i, lambdas, complex_wave, signal_measured, Z, r, k0, lb=Z_lb)
 
         signal_est = power_spectrum_from_complex_wave(omegas, complex_wave, r, Z, k0)
+        min_signal = np.min(signal_est)
+        if min_signal < 0:
+            print(f"signal estimated to have negative values")
 
-    return generate_matrix_F(omegas, Z) @ signal_est, Z, k0, error
+    return generate_matrix_F(omegas, Z) @ signal_est, Z, k0, error, signal_est
 
 
 def estimate_Z(lambdas, signal):
@@ -236,7 +238,7 @@ def refine_Z_tau(i, lambdas, complex_wave, signal_measured, Z, r, k0, lb=0):
 
 
 def spectrum_recovery_data(lambdas_nu, spectrum_nu, N=200, r=0.2, visible=True, Z=8E-6, n_iter=200,
-                           estimate_depth=False):
+                           estimate_depth=False, previous_spectrum=None, stop_error=None):
     """ Used in the main script"""
     k0 = 4.5
 
@@ -249,10 +251,11 @@ def spectrum_recovery_data(lambdas_nu, spectrum_nu, N=200, r=0.2, visible=True, 
                                        fill_value='extrapolate')(omegas)
     spectrum = np.maximum(0, spectrum)
 
-    spectrum_est, Z_est, k0_est, error = spectrum_recovery(omegas, spectrum, r=r, Z=Z, k0=k0, n_iter=n_iter,
-                                                           estimate_depth=estimate_depth)
+    spectrum_est, Z_est, k0_est, error, spectrum_low_res = spectrum_recovery(
+        omegas, spectrum, r=r, Z=Z, k0=k0, n_iter=n_iter, estimate_depth=estimate_depth,
+        previous_spectrum=previous_spectrum, stop_error=stop_error)
 
-    return spectrum_est, Z_est, k0_est, spectrum_est, error
+    return spectrum_est, Z_est, k0_est, spectrum_low_res, error
 
 
 if __name__ == '__main__':
@@ -266,10 +269,11 @@ if __name__ == '__main__':
               "Z": 5E-6,
               "k0": 3.7,
               "r":  0.7 * np.exp(1j * np.deg2rad(148)),
-              "n_iter": 500,
+              "n_iter": 300,
               "visible": True,
-              "downsampling": 300,
-              "estimate_depth": True,
+              "downsampling": 1,
+              "estimate_depth": False,
+              "stop_error": 0.01,
               "c": c}
 
     directory = 'Cubes/'
@@ -279,12 +283,20 @@ if __name__ == '__main__':
         print("\n")
         print("processing file", name)
 
+        if name == "parrot":
+            params["Z"] = 3.35e-6
+            params["k0"] = 3.09
+        if name == "saasfee":
+            params["Z"] = 2.76e-6
+            params["k0"] = 3.42
+
         data, wavelengths = dsd.load_specim_data(directory + name, ds=params["downsampling"], cut=True)
 
         start = time.time()
 
         def spectrum_recovery_row(x):
             inverted_row = np.zeros((data.shape[1], params["N"]))
+            inverted_low_res_row = []
             Z_row = np.zeros((data.shape[1]))
             k0_row = np.zeros((data.shape[1]))
             e_row = np.zeros((data.shape[1]))
@@ -292,7 +304,7 @@ if __name__ == '__main__':
             for y in range(data.shape[1]):
                 pixel_time = time.time()
                 print(f"processing ({x}, {y})")
-                spectrum_est, Z_est, k0_est, spec_lp, error = \
+                spectrum_est, Z_est, k0_est, spectrum_low_res, error = \
                     spectrum_recovery_data(wavelengths,
                                            data[x, y, :],
                                            N=params["N"],
@@ -300,24 +312,31 @@ if __name__ == '__main__':
                                            visible=params["visible"],
                                            Z=params["Z"],
                                            n_iter=params["n_iter"],
-                                           estimate_depth=params["estimate_depth"])
+                                           estimate_depth=params["estimate_depth"],
+                                           previous_spectrum=(None if y == 0 else spectrum_low_res),
+                                           stop_error=params["stop_error"])
                 inverted_row[y, :] = spectrum_est
+                inverted_low_res_row.append(spectrum_low_res)
                 Z_row[y] = Z_est
                 k0_row[y] = k0_est
                 e_row[y] = error
                 print(f"Pixel time: {time.time() - pixel_time}")
             print(f"Row time: {time.time() - row_time}")
-            return inverted_row, Z_row, k0_row, e_row
+            return inverted_row, Z_row, k0_row, e_row, np.array(inverted_low_res_row)
 
 
         pool = Pool(1)
-        inverted, Z_estimates, k0_estimates, errors = zip(*pool.map(spectrum_recovery_row, range(data.shape[0])))
+        inverted, Z_estimates, k0_estimates, errors, inverted_low_res = zip(*pool.map(
+            spectrum_recovery_row, range(data.shape[0])))
         inverted = np.array(inverted)
+        inverted_low_res = np.array(inverted_low_res).astype(float)
         params["errors"] = np.array(errors)
         if params["estimate_depth"]:
             params["Z_estimates"] = np.array(Z_estimates)
             params["k0_estimates"] = np.array(k0_estimates)
         print(f"Time elapsed: {time.time() - start}")
+
+        print(f"Min estimated: {np.min(inverted)}")
 
         i = 0
         dirname = f"PNAS/{i}/"
@@ -328,6 +347,7 @@ if __name__ == '__main__':
             dirname = f"PNAS/{i}/"
         os.mkdir(f"PNAS/{i}")
         np.save(dirname + name, inverted)
+        np.save(dirname + name + "_low_res", inverted_low_res)
         with open(dirname + name + ".pkl", 'wb') as handle:
             pickle.dump(params, handle)
 
