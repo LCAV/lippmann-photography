@@ -6,9 +6,9 @@
 *.lipp
 .directory
 *.zip
+*.png
 .ipynb_checkpoints/*
 2018-10-05 PhotoPlateGentet_Transmission/*
 Cubes/*
 Elysee_short/*
 Nature/*
-PNAS/*
