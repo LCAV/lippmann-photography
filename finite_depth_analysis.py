@@ -5,7 +5,8 @@ Created on Mon Jun 12 21:40:59 2017
 @author: gbaechle
 """
 
-import numpy as np
+import jax.numpy as np
+import jax.numpy as jnp
 import scipy as sp
 import scipy.interpolate
 import scipy.fftpack
@@ -85,42 +86,36 @@ def sinc_interp(x, s, u, padding=100):
     else:
         return y
 
+
 def s_z(Z, omega):
-    
-    #note: numpy sinc is sin(pi*x)/(pi*x)
+    """note: numpy sinc is sin(pi*x)/(pi*x)"""
+
     return Z*np.sinc(2*Z*omega/(np.pi*c))
-    
+
+
 def c_z(Z, omega):
     
-    x = np.asanyarray(2*Z*omega/c)
-    y = np.where(x == 0, 1.0e-20, x) 
-    
+    x = 2*Z*omega/c
+    y = x + 1.0e-30
+
     return Z*(1-np.cos(y))/y    
     
     
 def s_z_tilde(Z, omega):
     
-    x = np.asanyarray(2*Z*omega/c)
-    y = np.where(x == 0, 1.0e-30, x) 
+    x = 2*Z*omega/c
+    y = x + 1.0e-30
     
     return Z/(1j*y)*(1-np.exp(-1j*y))
 #    return s_z(Z, omega) + 1j*c_z(Z, omega)
-    
+
+
 def s_z_tilde_dev(Z, omega, k0=0):
     
-    if Z == 'inf' or Z == 'infinite':
-        x = np.asanyarray(2*omega/c)
-#        return 1j/np.where(np.abs(x) < 1E-10, 2j/(np.pi*c), -x)  
-        return 1j/np.where(x == 0, 1j, -x)  
-#        Z = 100E-6
-
-    if k0==0:
-        return s_z_tilde(Z, omega)
-    
-    x = np.asanyarray(c*k0+2j*omega*Z)
-    y = np.where(x == 0, 1.0e-30, x) 
+    x = c*k0+2j*omega*Z
+    y = y = x + 1.0e-30
         
-    return c*Z/y * (1-np.exp(-2j*omega*Z/c-k0))
+    return c*Z/y * (1-jnp.exp(-2j*omega*Z/c-k0))
 
 
 def s_z_tilde_prime_Z(Z, omega, k0=0):
@@ -131,14 +126,16 @@ def s_z_tilde_prime_Z(Z, omega, k0=0):
 def c_inf(omega):
     x = np.asanyarray(2*omega/c)
     return np.where(np.abs(x) < 1E-10, 0, 1/x)     
-    
+
+
 def c_high(omega):
     Z = 100E-6
     x = np.asanyarray(2*Z*omega/c)
     y = np.where(x == 0, 1.0e-20, x) 
     
     return Z*(1-np.cos(y))/y   
-    
+
+
 def e_inf(omega):
     x = np.asanyarray(2*omega/c, dtype=np.complex)
     return 1j/np.where(x == 0, 1j, x) 
@@ -148,24 +145,20 @@ def h(lambdas, lambda_prime, Z, r=-1, mode=1, k0=0):
     
     omega = 2*np.pi*c/lambdas 
     omega_prime = 2*np.pi*c/lambda_prime
-    
-    if mode==2:
-        if Z == 'inf' or Z == 'infinite':
-            Z = 100E-6
-        s1 = s_z_tilde_dev(Z, omega_prime-omega, k0=k0)
-        s3 = s_z_tilde_dev(Z, omega_prime+omega, k0=k0)
+
+    if mode == 2:
+        s1 = s_z_tilde_dev(Z, omega_prime[:, None]-omega[None, :], k0=k0)
+        s3 = s_z_tilde_dev(Z, omega_prime[:, None]+omega[None, :], k0=k0)
         return r/2*s1 + np.conj(r)/2*s3
-    elif mode==3:
-        s2 = s_z_tilde_dev(Z, omega_prime, k0=k0)
+    elif mode == 3:
+        s2 = s_z_tilde_dev(Z, np.tile(omega_prime[:, None], (1, len(omega))), k0=k0)
         return (1+np.abs(r)**2)/2*s2
     else:
-        s2 = s_z_tilde_dev(Z, omega_prime, k0=k0)
-        if Z == 'inf' or Z == 'infinite':
-            Z = 100E-6
-        s1 = s_z_tilde_dev(Z, omega_prime-omega, k0=k0)
-        s3 = s_z_tilde_dev(Z, omega_prime+omega, k0=k0)
+        s2 = s_z_tilde_dev(Z, omega_prime[:, None], k0=k0)
+        s1 = s_z_tilde_dev(Z, omega_prime[:, None]-omega[None, :], k0=k0)
+        s3 = s_z_tilde_dev(Z, omega_prime[:, None]+omega[None, :], k0=k0)
         return r/2*s1 + (1+np.abs(r)**2)/2*s2 + np.conj(r)/2*s3
-    
+
     
 def h_prime(lambdas, lambda_prime, Z, r=-1, k0=0):
     
@@ -176,20 +169,6 @@ def h_prime(lambdas, lambda_prime, Z, r=-1, k0=0):
     v = omega_prime
     
     return c/(u*(u-v)*(u+v))*((3*u**2-v**2)*np.sin(2*u*Z/c) + (3*u**2-v**2)*np.sin(2*(u-v)*Z/c) - 2*u*v*np.sin(2*v*Z/c) - 2*u*v*np.sin(4*v*Z/c) + 3*u**2*np.sin(2*(u+v)*Z/c) -v**2*np.sin(2*(u+v)*Z/c))
-    
-#    u = omega_prime-omega
-#    v = omega_prime
-#    w = omega_prime+omega
-#    
-#    cosu = np.cos(2*u*Z/c)
-#    cosv = np.cos(2*v*Z/c)
-#    cosw = np.cos(2*w*Z/c)
-#    
-#    sinu = np.sin(2*u*Z/c)
-#    sinv = np.sin(2*v*Z/c)
-#    sinw = np.sin(2*w*Z/c)
-#    
-#    return c/(u*v*w)*(cosu+cosv+cosw-sinu-sinv-sinw)*(u*v-u*w-v*w + v*w*cosu + u*w*cosv + u*v*cosw + vw*sinu + u*w*sinv + u*v*sinw)
 
 
 def h_sym(lambdas, lambda_prime, Z, r=-1):
@@ -198,7 +177,8 @@ def h_sym(lambdas, lambda_prime, Z, r=-1):
     omega_prime = 2*np.pi*c/lambda_prime
      
     return r/2*s_z(Z, omega-omega_prime) + (1+np.abs(r)**2)/2*s_z(Z, omega_prime) + np.conj(r)/2*s_z(Z, omega+omega_prime)                     
-    
+
+
 def plot_h(lambdas, filt, name='h', lambda_prime=500E-9, Z=5E-6, complex_valued=True, ax=None, paper_mode=False):
     
     if paper_mode:

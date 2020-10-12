@@ -70,12 +70,8 @@ def generate_matrix_A(omegas, Z, r=-1, mode=1, k0=0, over_samples=0):
         omegas_over = np.arange(ma + over_samples * delta, mi - over_samples * delta, -delta)
     lambdas_over = 2 * np.pi * c / omegas_over
 
-    A = np.zeros((len(omegas), len(omegas_over)), dtype=complex)
-    A0 = np.zeros((len(omegas), len(omegas)), dtype=complex)
-
-    for i, lambda_prime in enumerate(lambdas):
-        A[i, :] = fda.h(lambdas_over, lambda_prime, Z, r=r, mode=2, k0=k0)
-        A0[i, :] = fda.h(lambdas_over, lambda_prime, Z, r=r, mode=3, k0=k0)
+    A = fda.h(lambdas_over, lambdas, Z, r=r, mode=2, k0=k0)
+    A0 = fda.h(lambdas_over, lambdas, Z, r=r, mode=3, k0=k0)
 
     if over_samples == 0:
         A_cropped = A
@@ -266,15 +262,16 @@ if __name__ == '__main__':
     plt.close('all')
 
     params = {"N": 200,
-              "Z": 5E-6,
+              "Z": 3E-6,
               "k0": 3.7,
               "r":  0.7 * np.exp(1j * np.deg2rad(148)),
               "n_iter": 300,
               "visible": True,
-              "downsampling": 1,
+              "downsampling": 25,
               "estimate_depth": False,
-              "stop_error": 0.01,
-              "c": c}
+              "stop_error": 0.005,
+              "c": c,
+              "mask_purple": False}
 
     directory = 'Cubes/'
 
@@ -291,6 +288,14 @@ if __name__ == '__main__':
             params["k0"] = 3.42
 
         data, wavelengths = dsd.load_specim_data(directory + name, ds=params["downsampling"], cut=True)
+
+        if params["mask_purple"]:
+            def sigmoid(x):
+                return 1 / (1 + np.exp(-x))
+
+            mask = np.linspace(3, 50, len(wavelengths))
+            mask = sigmoid(mask)
+            data *= mask[None, None, :]
 
         start = time.time()
 
