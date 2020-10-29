@@ -289,6 +289,15 @@ if __name__ == '__main__':
 
         data, wavelengths = dsd.load_specim_data(directory + name, ds=params["downsampling"], cut=True)
 
+        if name == "color_checker":
+            w, trans, _ = dsd.read_file(
+                'dyes/Transmission_Reference.txt')
+            _, trans_glass, _ = dsd.read_file(
+                'dyes/Transmission_OnlyGlass.txt')
+            dyes = trans_glass - trans
+            dyes_interpolated = np.interp(wavelengths, w, dyes)
+            data = data / (1 + dyes_interpolated[None, None, ])
+
         if params["mask_purple"]:
             def sigmoid(x):
                 return 1 / (1 + np.exp(-x))

@@ -208,3 +208,8 @@ def upsample_hue_saturation(original, subsampled, order):
     large_hsv[:, :, 2] = rgb2hsv(original)[:, :, 2]
     return hsv2rgb(large_hsv)
 
+
+def spectrum_to_rgb(wavelengths, spectrum):
+    spectrum_xyz = from_spectrum_to_xyz(wavelengths, spectrum, normalize=False)
+    spectrum_xyz = spectrum_xyz / np.min(np.sum(spectrum_xyz, axis=2))
+    return from_xyz_to_rgb(spectrum_xyz)
