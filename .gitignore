@@ -5,3 +5,11 @@
 *.csv
 *.lipp
 .directory
+*.zip
+*.png
+.ipynb_checkpoints/*
+dyes/*
+Cubes/*
+Elysee_short/*
+Nature/*
+PNAS/*
