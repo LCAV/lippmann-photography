@@ -141,7 +141,7 @@ class PolychromaticPlaneWave(object):
 
 class LippmannPlate(object):
     
-    def __init__(self, direction=np.array([0.0, 0.0, 1.0]), wave_lengths, n_x, n_y, n=1.0, E_0=1.0, phi_0=np.pi/2.0):
+    def __init__(self, wave_lengths, n_x, n_y, direction=np.array([0.0, 0.0, 1.0]), n=1.0, E_0=1.0, phi_0=np.pi/2.0):
         
         self.width  = n_x
         self.height = n_y

@@ -132,18 +132,17 @@ def from_spectrum_to_xyz(wavelengths, spectral_colors, integrate_nu=True, normal
 #    X = np.dot(spectral_colors, cmf_cie_x)
 #    Y = np.dot(spectral_colors, cmf_cie_y)
 #    Z = np.dot(spectral_colors, cmf_cie_z)
-    
-    
-    #'normalize'
+
+    # 'normalize'
     if normalize:
-#        normalization_cste = np.max(Y)
+        # normalization_cste = np.max(Y)
         normalization_cste = X+Y+Z
         X = X/normalization_cste
         Y = Y/normalization_cste
         Z = Z/normalization_cste
         
 #    return np.stack([x,y,z], axis=-1)
-    return np.stack([X,Y,Z], axis=-1)
+    return np.stack([X, Y, Z], axis=-1)
 
 
 def from_xyz_to_spectrum(xyz_colors, wavelengths, nnls=False):
