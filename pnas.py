@@ -21,8 +21,6 @@ sys.path.append("../")
 from lippmann import *
 #from finite_depth_analysis import *
 
-snsty.setStyleMinorProject(black=black_theme)
-#snsty.setStylePNAS()
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 
@@ -115,7 +113,6 @@ def plot_pipeline(N=500):
     axes[4].set_yticks([0])
 #    axes[4].set_xticklabels([400, '$\lambda~(nm)$', 700])
     
-    [ax.set(adjustable='box-forced') for ax in axes]
     axes[0].set_title('(a) Original spectrum')
     axes[1].set_title('(b) Intensity of interferences')
     axes[2].set_title('(c) Silver density')

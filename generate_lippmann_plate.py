@@ -11,6 +11,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from skimage.color import rgb2xyz, xyz2rgb
 from lippmann import *
+import imageio
 
 import sys
 sys.path.append("../")
@@ -22,7 +23,7 @@ plt.close('all')
 
 def read_image(path):
 
-    return misc.imread(path).astype(float)/255.
+    return imageio.imread(path).astype(float)/255.
     
     
 def compute_spectrum_slice(sliced, lambdas):

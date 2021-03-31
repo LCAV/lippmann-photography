@@ -5,8 +5,7 @@ Created on Mon Jun 12 21:40:59 2017
 @author: gbaechle
 """
 
-import jax.numpy as np
-import jax.numpy as jnp
+import numpy as np
 import scipy as sp
 import scipy.interpolate
 import scipy.fftpack
@@ -115,7 +114,7 @@ def s_z_tilde_dev(Z, omega, k0=0):
     x = c*k0+2j*omega*Z
     y = y = x + 1.0e-30
         
-    return c*Z/y * (1-jnp.exp(-2j*omega*Z/c-k0))
+    return c*Z/y * (1-np.exp(-2j*omega*Z/c-k0))
 
 
 def s_z_tilde_prime_Z(Z, omega, k0=0):
@@ -326,26 +325,27 @@ def apply_h(spectrum, Z, lambdas, lambdas_prime, symmetric=False, infinite=False
         if symmetric:
             return spectrum_prime
 
-    for i, lambda_prime in enumerate(lambdas_prime):
-        
-        omega_prime = 2*np.pi*c/lambda_prime  
-        
-        if infinite:
+    if infinite:
+
+        for i, lambda_prime in enumerate(lambdas_prime):
+
+            omega_prime = 2*np.pi*c/lambda_prime
+
             filt = r/2*c_high(omega_prime-omegas) + np.conj(r)/2*c_high(omegas+omega_prime)
             if omega_prime < 0:
                 new_spectrum[i] = np.conj(r)*c*np.pi/4*spectrum_prime[i]+1j*np.trapz(spectrum*filt, omegas)
             else:
                 new_spectrum[i] = r*c*np.pi/4*spectrum_prime[i]+1j*np.trapz(spectrum*filt, omegas)
-                
-        elif symmetric:
-            new_spectrum[i] = -np.trapz(spectrum*h_sym(lambdas, lambda_prime, Z, r=r), omegas)
-               
-        else:
-            new_spectrum[i] = -np.trapz(spectrum*h(lambdas, lambda_prime, Z, r=r, mode=mode, k0=k0), omegas)
-    
-    if infinite:
+
         Pw = np.trapz(spectrum, omegas)
         new_spectrum += 1j*(1+np.abs(r)**2)/2*c_inf(omegas_prime)*Pw
+                
+    elif symmetric:
+        new_spectrum = -np.trapz(spectrum*h_sym(lambdas, lambdas_prime, Z, r=r), omegas)
+               
+    else:
+        new_spectrum = -np.trapz(spectrum*h(lambdas, lambdas_prime, Z, r=r, mode=mode, k0=k0), omegas)
+
     
     if normalize:
         return new_spectrum/np.trapz(spectrum, omegas)*(np.max(omegas)-np.min(omegas))
