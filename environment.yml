@@ -7,9 +7,9 @@ dependencies:
   - attrs=20.2.0=py_0
   - backcall=0.2.0=py_0
   - blas=1.0=mkl
-  - bleach=3.2.0=py_0
-  - ca-certificates=2020.7.22=0
-  - certifi=2020.6.20=py38_0
+  - bleach=3.3.0=pyhd3eb1b0_0
+  - ca-certificates=2021.1.19=h06a4308_1
+  - certifi=2020.12.5=py38h06a4308_0
   - cffi=1.14.2=py38he30daa8_0
   - cloudpickle=1.6.0=py_0
   - cycler=0.10.0=py38_0
@@ -37,7 +37,7 @@ dependencies:
   - ipython_genutils=0.2.0=py38_0
   - ipywidgets=7.5.1=py_0
   - jedi=0.17.2=py38_0
-  - jinja2=2.11.2=py_0
+  - jinja2=2.11.3=pyhd3eb1b0_0
   - jpeg=9b=h024ee3a_2
   - jsonschema=3.2.0=py38_0
   - jupyter=1.0.0=py38_7
@@ -71,11 +71,11 @@ dependencies:
   - nbformat=5.0.7=py_0
   - ncurses=6.2=he6710b0_1
   - networkx=2.5=py_0
-  - notebook=6.1.1=py38_0
+  - notebook=6.3.0=py38h06a4308_0
   - numpy=1.19.1=py38hbc911f0_0
   - numpy-base=1.19.1=py38hfa32c7d_0
   - olefile=0.46=py_0
-  - openssl=1.1.1g=h7b6447c_0
+  - openssl=1.1.1k=h27cfd23_0
   - packaging=20.4=py_0
   - pandas=1.1.1=py38he6710b0_0
   - pandoc=2.10.1=0
@@ -91,7 +91,7 @@ dependencies:
   - prompt_toolkit=3.0.7=0
   - ptyprocess=0.6.0=py38_0
   - pycparser=2.20=py_2
-  - pygments=2.7.0=py_0
+  - pygments=2.8.1=pyhd3eb1b0_0
   - pyparsing=2.4.7=py_0
   - pyqt=5.9.2=py38h05f1152_4
   - pyrsistent=0.17.3=py38h7b6447c_0
@@ -99,7 +99,7 @@ dependencies:
   - python-dateutil=2.8.1=py_0
   - pytz=2020.1=py_0
   - pywavelets=1.1.1=py38h7b6447c_0
-  - pyyaml=5.3.1=py38h7b6447c_1
+  - pyyaml=5.4.1=py38h27cfd23_1
   - pyzmq=19.0.1=py38he6710b0_1
   - qt=5.9.7=h5867ecd_1
   - qtconsole=4.7.6=py_0
