@@ -27,8 +27,7 @@ You can install all standard python requirements it (at least) two ways:
 
 ## Data
 Data for this repository is available separately at 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4650243.svg)](https://doi.
-org/10.5281/zenodo.4650243)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4650243.svg)](https://doi.org/10.5281/zenodo.4650243)
 
 ## Structure
 
