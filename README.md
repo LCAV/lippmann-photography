@@ -1,4 +1,7 @@
 # Lippmann Photography
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4256774.svg)](https://doi.org/10.5281/zenodo.4256774)
+
 Code to analyse hyperspectral measurements historical Lippmann photographs and simulate the Lippmann proces. 
 
 ## Authors
@@ -22,6 +25,24 @@ You can install all standard python requirements it (at least) two ways:
     conda env create -f environment.yml
     ```
 
+## Data
+Data for this repository is available separately at 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4650243.svg)](https://doi.org/10.5281/zenodo.4650243)
+
+## Structure
+
+To visualise results view `PNAS resutls.jpynb` with Jupyter Notebook. 
+To generate data run `spectrum_recovery_pool.py`. Code for counting oscillations 
+is exceptionally in MATLAB, not python in `oscillations_counting.m`.
+
+## How to cite this code
+
+Gilles Baechler, Michalina Pacholska, Adam Scholefield, & Arnaud Latty. (2020, 
+November 7). LCAV/lippmann-photography (Version v0.1). Zenodo. 
+http://doi.org/10.5281/zenodo.4256775
+
+or see http://doi.org/10.5281/zenodo.4256775 for other formats.
+    
 ## License
 
 Copyright 2020 Gilles Baechler, Michalina Pacholska, Adam Scholefield, Arnaud Latty
