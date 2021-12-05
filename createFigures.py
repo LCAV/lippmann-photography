@@ -35,9 +35,10 @@ def add_horizontal_lines(xrange, yrange):
 
 if __name__ == '__main__':
     
-    plot_gaussian_lippmann_and_inverses()
+    # plot_gaussian_lippmann_and_inverses()
     plot_mono_lippmann_and_inverses()
-    plot_rect_lippmann_and_inverses()
+    # plt.savefig("Figures/mono.pdf")
+    # plot_rect_lippmann_and_inverses()
 
 
 
